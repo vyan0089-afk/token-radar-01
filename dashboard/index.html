@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token Radar — pre-token protocols ranked by implied value</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <h1>Token Radar</h1>
+    <p class="tag">Which pre-token protocol is worth farming next — and what to do about it.</p>
+  </div>
+  <div class="meta" id="meta"></div>
+</header>
+
+<section class="kpi" id="kpi" aria-label="Summary"></section>
+
+<section class="spot" id="spot" aria-label="Top three"></section>
+
+<section class="controls" aria-label="Filters">
+  <input id="q" type="search" placeholder="Search name or slug…" aria-label="Search">
+  <select id="cat" aria-label="Category"><option value="">All categories</option></select>
+  <select id="chain" aria-label="Chain"><option value="">All chains</option></select>
+  <select id="scope" aria-label="Scope">
+    <option value="all">Whole board</option>
+    <option value="watchlist">Watchlist only</option>
+    <option value="early">Early finds only</option>
+  </select>
+  <select id="sort" aria-label="Sort by">
+    <option value="rank">Sort: rank</option>
+    <option value="implied">Sort: implied value</option>
+    <option value="tvl">Sort: TVL</option>
+    <option value="growth">Sort: 7-day growth</option>
+    <option value="age">Sort: age</option>
+  </select>
+  <button id="reset" type="button">Reset</button>
+</section>
+
+
+
+
+
+
+
+
+
+
+
+<main>
+  <section class="boardwrap" aria-label="Ranked board">
+    <h2 id="boardtitle">Ranked board</h2>
+    <p class="count" id="count"></p>
+    <table id="board">
+      <thead><tr>
+        <th>#</th><th>Protocol</th><th>Category</th><th>Chains</th>
+        <th class="num">TVL</th><th class="num">7d</th><th class="num">Age</th>
+        <th class="num">Implied value</th><th></th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <button id="more" type="button">Show more</button>
+  </section>
+  <aside class="detail" id="detail" aria-label="Protocol detail"></aside>
+</main>
+
+<section class="model" aria-label="Model sandbox">
+  <div>
+    <h2>Value model <span class="ver" id="modelver"></span></h2>
+    <p id="modeltext"></p>
+  </div>
+  <div class="sliders">
+    <label>Curve value × <output id="oScale">1.00</output>
+      <input id="scale" type="range" min="0.5" max="2" step="0.05" value="1"></label>
+    <label>Growth weight <output id="oGrowth">0.50</output>
+      <input id="growthw" type="range" min="0" max="1" step="0.05" value="0.5"></label>
+    <label>Deposit <select id="deposit"><option value="1000" selected>$1,000</option><option value="5000">$5,000</option><option value="25000">$25,000</option></select></label>
+    <label>Farmed capital <select id="farmed"><option value="0.1">10% of TVL</option><option value="0.25" selected>25% of TVL</option><option value="0.5">50% of TVL</option></select></label>
+    <label>T-bill yield <select id="tbill"><option value="0">0% a year</option><option value="0.04" selected>4% a year</option><option value="0.08">8% a year</option></select></label>
+    <button id="sandboxReset" type="button">Reset model</button>
+    <p class="sandnote" id="sandnote">Sandbox off: showing the submitted board.</p>
+  </div>
+</section>
+
+<section class="valid" aria-label="Backtest">
+  <h2>Backtest — is the model honest?</h2>
+  <p id="validtext"></p>
+  <table id="valid">
+    <thead><tr><th>Check</th><th class="num">Fitted curve</th><th class="num">Flat multiple</th></tr></thead>
+    <tbody id="validrows"></tbody>
+  </table>
+  <p class="note">Leave-one-out on the listed protocols the model can price (not an exchange, not a versioned release): each protocol's market cap is predicted from a curve fitted without it — the curve is refitted per fold, including its outlier trim and its bridge shift. The flat multiple is the old radar-2 yardstick (median market-cap-per-TVL of its category). The older-into-newer rows fit the curve only on protocols listed before the date and predict the ones listed after. The intervals come from the fitted curve's own log residuals — P25–P75 should hold about half the held-out values, P10–P90 about four fifths — and the age rows use those same intervals, so they show where the intervals run thin for newer protocols. The launch-odds rows are the ensemble model (age-band rate plus logistic regression, averaged in logit space), tested on a hold-out split by slug order and again under 5-fold cross-validation.</p>
+</section>
+
+<section class="account" aria-label="Accounting for all 758 protocols">
+  <h2>Where all 758 protocols went</h2>
+  <p>Every protocol in the snapshot sits in exactly one bucket below — the counts add up to 758. Only the first row is ranked.</p>
+  <table id="account">
+    <thead><tr><th>Bucket</th><th class="num">Protocols</th><th>Why</th></tr></thead>
+    <tbody id="accountrows"></tbody>
+  </table>
+</section>
+
+<section class="scatterwrap" aria-label="Value against TVL">
+  <h2>Value against TVL</h2>
+  <p>Traded protocols (their market caps) against pre-token ones (their implied values), both on a log scale, with the fitted size curve (solid line) and the bridge curve (dashed line, shifted up by the fitted bridge term). If the model is right, the amber dots should sit near the line the teal dots made.</p>
+  <div id="scatter"></div>
+</section>
+
+<section class="livewrap" aria-label="Live tokens for comparison">
+  <h2>Already trading — the market's own values</h2>
+  <p>Listed protocols are not ranked here. Their market caps are the data the fitted size curve is trained on — that is the model's anchor.</p>
+  <table id="live">
+    <thead><tr><th>Protocol</th><th>Category</th><th class="num">TVL</th><th class="num">Market cap</th><th class="num">Mcap / TVL</th></tr></thead>
+    <tbody id="liverows"></tbody>
+  </table>
+</section>
+
+<section class="how" aria-label="How to read this radar">
+  <h2>How to read this radar</h2>
+  <ol>
+    <li><b>Start at the top.</b> Rank 1 is the board's most valuable pre-token protocol under the model below.</li>
+    <li><b>Check the maths.</b> Open a protocol: its detail shows the fitted size curve (log market cap = a + b × log TVL, plus a fitted shift for bridges, fitted on listed protocols that are not exchanges after trimming outliers), its launch odds (an ensemble of its age-band-and-category rate and a logistic model), growth, maturity and chains — multiplied into the implied value. Every number comes from the snapshot.</li>
+    <li><b>Farm it.</b> Each protocol carries seven concrete steps with a cost and a time — the seventh is the exit rule — plus the farm's economics on a $1,000 deposit: expected value, gas, the T-bill yield forgone, net, net per hour and the break-even launch odds. Never pay to claim: claim only from the protocol's own page.</li>
+    <li><b>Compare.</b> The live-token table shows what the market already pays per TVL dollar in each category — that is the model's anchor.</li>
+  </ol>
+  <p class="note">A protocol is listed as pre-token because its snapshot record carries no token — not as proof it has none. Implied value is this radar's claim, not a prediction that a token will launch or what it will trade at.</p>
+</section>
+
+<footer>
+  <p id="foot"></p>
+</footer>
+
+<script src="../data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
