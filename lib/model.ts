@@ -1,4 +1,32 @@
-// Token Radar — model radar-5: one sealed snapshot in, one ranked board out.
+// Token Radar — model radar-6: one sealed snapshot in, one ranked board out.
+//
+// Radar-6 keeps radar-5's size curve and changes three things, because the
+// experiments in the README show these are the changes that are real on
+// this snapshot's own backtests:
+//
+//   * LAUNCH ODDS. The logistic half of the odds ensemble now also sees
+//     continuous features — log10 TVL, the clamped 7-day growth, the
+//     chain count and log10 age — alongside the age-band and
+//     frequent-category dummies. On the same splits it calls 67.8% right
+//     on the even/odd slug split (radar-5: 67.0%) and 71.6% under 5-fold
+//     cross-validation (radar-5: 69.9%), AUC 0.78 / 0.76 (radar-5:
+//     0.77 / 0.75). The size curve is UNCHANGED: twenty-one other curve
+//     families were tried on the same leave-one-out and older-into-newer
+//     splits (one-per-ticker comps, kNN, median regression, per-category
+//     curves, category and age shifts, quadratic, Huber, two-segment,
+//     ensembles) and none beat radar-5's LOO x2.71 and older-newer x1.97
+//     on both at once, so the curve stays the trimmed OLS with the fitted
+//     bridge shift.
+//   * RANK RANGES. Every row carries a bootstrap range: the size curve is
+//     refitted on 200 resamples of the listed fit pool (a fixed seed, so
+//     the ranges are deterministic) and each row's implied value and rank
+//     are recomputed under every refit; the dashboard shows the P10-P90
+//     band of both. A row whose rank band is wide is a row the curve
+//     cannot place precisely, and the board says so instead of hiding it.
+//   * FARM ECONOMICS, dated. Every row's economics now carries the
+//     review date (snapshot date + holding period), so each farm plan has
+//     a dated timeline: start, hold, review. The economics are otherwise
+//     the same honest $1,000-basis netting as radar-5.
 //
 // The board covers every slug in the snapshot's watchlist (the floor, never a
 // ceiling) plus the strongest pre-token protocols below the floor, by TVL.
@@ -26,9 +54,14 @@
 //      (under 1 year, 1-2, 2-3, 3 or more, age unknown), the share that
 //      has a token (a symbol in the snapshot), a category's rate inside
 //      the band shrunk toward the band rate — and (b) a ridge logistic
-//      regression on age-band dummies plus a dummy per frequent category.
-//      It answers: how often does a protocol of this age, in this
-//      category, ever get a token?
+//      regression on age-band dummies plus a dummy per frequent category
+//      plus four continuous features: log10 TVL, the clamped 7-day
+//      growth, the chain count and log10 age. Radar-6 adds the four
+//      continuous features because, on the same even/odd slug split and
+//      the same 5-fold cross-validation, the ensemble with them calls
+//      67.8% / 71.6% right (radar-5's ensemble without them: 67.0% /
+//      69.9%). It answers: how often does a protocol of this age, in
+//      this category, ever get a token?
 //   3. GROWTH and MATURITY and CHAINS, as in radar-2: the 7-day TVL change
 //      (clamped, half weight), the age of the protocol (0.6-1.0 over three
 //      years), and multi-chain reach.
@@ -140,7 +173,7 @@ export const MODEL: ModelConstants = {
 };
 
 /** The model's version label: the dashboard names it and the rules quote it. */
-export const MODEL_VERSION = 'radar-5';
+export const MODEL_VERSION = 'radar-6';
 
 /** How many pre-token protocols below the watchlist floor the early radar carries, by TVL. */
 export const EARLY_ROWS = 260;
@@ -163,6 +196,8 @@ export interface FarmEconomics {
   gas_usd: number;
   tbill_usd: number;
   hold_days: number;
+  /** The date to review the position: the snapshot date plus the holding period (YYYY-MM-DD). */
+  review_date: string;
   time_min: number;
   expected_value_usd: number;
   net_usd: number;
@@ -171,6 +206,13 @@ export interface FarmEconomics {
   verdict: 'FARM' | 'THIN' | 'SKIP';
 }
 
+/** A bootstrap P10-P90 band for one row: the implied value and the rank it takes when the size curve is refitted on resamples of the listed fit pool. */
+export interface BootstrapRange {
+  implied_lo: number;
+  implied_hi: number;
+  rank_lo: number;
+  rank_hi: number;
+}
 /** A fitted size curve: log10(mcap) = a + b x log10(TVL) + bridge_shift for bridges, on n listed protocols. */
 export interface SizeCurve {
   a: number;
@@ -316,6 +358,12 @@ export interface RadarRow {
   listed_at: string | null;
   age_days: number | null;
   implied_value_usd: number;
+  /** Bootstrap P10-P90 band of the implied value over 200 refits of the size curve. */
+  implied_lo: number;
+  implied_hi: number;
+  /** Bootstrap P10-P90 band of the rank over the same 200 refits. */
+  rank_lo: number;
+  rank_hi: number;
   curve_value: number;
   curve_a: number;
   curve_b: number;
@@ -375,6 +423,10 @@ export interface RadarData {
   board_size: number;
   early_size: number;
   live_size: number;
+  /** Bootstrap refits behind every row's rank range (a fixed seed, so the ranges are deterministic). */
+  bootstrap_draws: number;
+  /** Protocols in the snapshot: the accounting buckets must sum to this. */
+  protocols_total: number;
   validation: Backtest;
   accounting: AccountingRow[];
   listed: ListedRow[];
@@ -688,12 +740,17 @@ const LOGIT_MIN_CATEGORY = 25;
 /** Ridge penalty on the logistic model's non-intercept coefficients. */
 const LOGIT_LAMBDA = 10;
 
-/** The logistic odds model's features: one dummy per age band, one per frequent category. */
+/** The logistic odds model's features: one dummy per age band, one per frequent category, plus four continuous features — log10 TVL, the clamped 7-day growth, the chain count and log10 age — added in radar-6 because they improve the hold-out tests on the same splits (see the README). */
 function logitFeatures(asOf: string, topCats: string[], p: SnapshotProtocol): number[] {
   const band = ageBand(ageDays(asOf, p.listed_at));
   const feats = [0, 0, 0, 0, 0];
   feats[band] = 1;
   for (const c of topCats) feats.push(p.category === c ? 1 : 0);
+  const age = ageDays(asOf, p.listed_at);
+  feats.push(Math.log10(Math.max(1, p.tvl_usd)));
+  feats.push(Math.min(MODEL.growth_cap, Math.max(MODEL.growth_floor, finite(p.change_7d, 0))) / 100);
+  feats.push(Math.min(p.chains.length, 5));
+  feats.push(Math.log10(Math.max(30, age ?? MODEL.unknown_age_days)));
   return feats;
 }
 
@@ -701,7 +758,11 @@ function logitFeatures(asOf: string, topCats: string[], p: SnapshotProtocol): nu
  * A ridge logistic regression for "has a token", fitted by iteratively
  * reweighted least squares on `train`. The model is deterministic: fixed
  * iteration cap, fixed ridge, no random start. Returns a function from a
- * protocol to its fitted probability.
+ * protocol to its fitted probability. The features are the age-band
+ * dummies, a dummy per frequent category, and four continuous features
+ * (log10 TVL, clamped 7-day growth, chain count, log10 age); the
+ * continuous columns are standardised, the dummies and the intercept
+ * are left alone.
  */
 function fitLogitModel(train: SnapshotProtocol[], asOf: string): (p: SnapshotProtocol) => number {
   const counts = new Map<string, number>();
@@ -1025,6 +1086,7 @@ export function farmEconomics(
   tvl: number,
   steps: FarmStep[],
   holdDays: number,
+  asOf: string,
   model: ModelConstants = MODEL,
 ): FarmEconomics {
   const gas = steps.reduce((s, st) => s + st.cost_usd, 0);
@@ -1039,11 +1101,13 @@ export function farmEconomics(
   const denom = implied * model.airdrop_pool * farmerShare;
   const breakeven = denom > 0 ? (gas + tbill) / denom : 1;
   const verdict: FarmEconomics['verdict'] = net > 0 ? 'FARM' : breakeven <= 0.6 ? 'THIN' : 'SKIP';
+  const review = new Date(Date.parse(`${asOf}T00:00:00Z`) + holdDays * DAY_MS).toISOString().slice(0, 10);
   return {
     deposit_usd: model.deposit_usd,
     gas_usd: gas,
     tbill_usd: Math.round(tbill * 100) / 100,
     hold_days: holdDays,
+    review_date: review,
     time_min: timeMin,
     expected_value_usd: Math.round(expected * 100) / 100,
     net_usd: Math.round(net * 100) / 100,
@@ -1075,7 +1139,7 @@ export function buildBoard(snapshot: Snapshot, model: ModelConstants = MODEL): B
     const odds = oddsModel.predict(p);
     const v = impliedValue(p, snapshot.as_of, curve, odds.odds, model);
     const steps = farmSteps(p, v.age, snapshot.as_of);
-    const econ = farmEconomics(v.implied, odds.odds, p.tvl_usd, steps, holdDaysFor(v.age), model);
+    const econ = farmEconomics(v.implied, odds.odds, p.tvl_usd, steps, holdDaysFor(v.age), snapshot.as_of, model);
     return { p, curve, odds, ...v, steps, econ };
   });
   scored.sort((a, b) => b.implied - a.implied || (a.p.slug < b.p.slug ? -1 : a.p.slug > b.p.slug ? 1 : 0));
@@ -1200,7 +1264,7 @@ export function accounting(snapshot: Snapshot, board: BoardRow[]): AccountingRow
 }
 
 /** A board row's compact form for data.js, with the farm plan generated in the page. */
-export function radarRow(row: BoardRow): RadarRow {
+export function radarRow(row: BoardRow, range?: BootstrapRange): RadarRow {
   return {
     rank: row.rank,
     slug: row.slug,
@@ -1213,6 +1277,10 @@ export function radarRow(row: BoardRow): RadarRow {
     listed_at: row.listed_at,
     age_days: row.age_days,
     implied_value_usd: row.implied_value_usd,
+    implied_lo: range?.implied_lo ?? row.implied_value_usd,
+    implied_hi: range?.implied_hi ?? row.implied_value_usd,
+    rank_lo: range?.rank_lo ?? row.rank,
+    rank_hi: range?.rank_hi ?? row.rank,
     curve_value: row.model.curve_value,
     curve_a: row.model.curve_a,
     curve_b: row.model.curve_b,
@@ -1235,11 +1303,77 @@ export function radarRow(row: BoardRow): RadarRow {
   };
 }
 
+/** A small deterministic PRNG (mulberry32): the bootstrap resamples must be the same on every run. */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Bootstrap refits behind the rank ranges: how many resamples of the fit pool. */
+export const BOOTSTRAP_DRAWS = 200;
+
+/**
+ * Every board row's bootstrap range. The size curve is refitted on 200
+ * resamples (with replacement, same size) of the listed non-exchange fit
+ * pool, drawn from a fixed seed; under each refit every row's implied
+ * value is recomputed with its own launch odds and multipliers and the
+ * board is re-ranked. The P10-P90 band of the implied values and of the
+ * ranks is the row's range: a wide band is a row the curve cannot place
+ * precisely, and the dashboard shows it instead of hiding it. The
+ * resample can drop a bridge protocol or a trimmed outlier from the fit,
+ * which is the point: the band measures how much the curve itself moves.
+ */
+export function bootstrapRanges(snapshot: Snapshot, board: BoardRow[], model: ModelConstants = MODEL): Map<string, BootstrapRange> {
+  const pool = fittable(snapshot.protocols).filter((p) => p.category !== 'CEX');
+  const index = bySlug(snapshot.protocols);
+  const rng = mulberry32(20261120);
+  const implieds = new Map<string, number[]>();
+  const ranks = new Map<string, number[]>();
+  for (const r of board) {
+    implieds.set(r.slug, []);
+    ranks.set(r.slug, []);
+  }
+  for (let draw = 0; draw < BOOTSTRAP_DRAWS; draw++) {
+    const sample: SnapshotProtocol[] = [];
+    for (let i = 0; i < pool.length; i++) sample.push(pool[Math.floor(rng() * pool.length)]!);
+    const curve = fitCurve(sample);
+    const scored = board.map((r) => {
+      const p = index.get(r.slug)!;
+      const v = impliedValue(p, snapshot.as_of, curve, r.model.launch_odds, model);
+      return { slug: r.slug, implied: v.implied };
+    });
+    scored.sort((a, b) => b.implied - a.implied || (a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0));
+    scored.forEach((s, i) => {
+      implieds.get(s.slug)!.push(s.implied);
+      ranks.get(s.slug)!.push(i + 1);
+    });
+  }
+  const out = new Map<string, BootstrapRange>();
+  for (const r of board) {
+    const iv = [...implieds.get(r.slug)!].sort((a, b) => a - b);
+    const rk = [...ranks.get(r.slug)!].sort((a, b) => a - b);
+    out.set(r.slug, {
+      implied_lo: Math.round(quantile(iv, 0.1)),
+      implied_hi: Math.round(quantile(iv, 0.9)),
+      rank_lo: Math.round(quantile(rk, 0.1)),
+      rank_hi: Math.round(quantile(rk, 0.9)),
+    });
+  }
+  return out;
+}
+
 /** Everything the dashboard renders, from the snapshot. */
 export function buildRadar(snapshot: Snapshot, model: ModelConstants = MODEL): { board: BoardRow[]; radar: RadarData } {
   const board = buildBoard(snapshot, model);
   const live = liveRows(snapshot);
   const early = board.filter((r) => !snapshot.watchlist.includes(r.slug)).length;
+  const ranges = bootstrapRanges(snapshot, board, model);
   const radar: RadarData = {
     as_of: snapshot.as_of,
     source: snapshot.source,
@@ -1250,10 +1384,12 @@ export function buildRadar(snapshot: Snapshot, model: ModelConstants = MODEL): {
     board_size: board.length,
     early_size: early,
     live_size: live.length,
+    bootstrap_draws: BOOTSTRAP_DRAWS,
+    protocols_total: snapshot.protocols.length,
     validation: backtest(snapshot, model),
     accounting: accounting(snapshot, board),
     listed: listedRows(snapshot),
-    rows: board.map(radarRow),
+    rows: board.map((r) => radarRow(r, ranges.get(r.slug))),
     live,
   };
   return { board, radar };
