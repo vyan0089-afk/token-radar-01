@@ -19,6 +19,8 @@
 
 <section class="spot" id="spot" aria-label="Top three"></section>
 
+<section class="strip" id="strip" aria-label="Integrity strip — every protocol accounted for"></section>
+
 <section class="controls" aria-label="Filters">
   <input id="q" type="search" placeholder="Search name or slug…" aria-label="Search">
   <select id="cat" aria-label="Category"><option value="">All categories</option></select>
@@ -36,6 +38,8 @@
     <option value="age">Sort: age</option>
   </select>
   <button id="reset" type="button">Reset</button>
+  <button id="exportCsv" type="button">Export CSV</button>
+  <button id="exportJson" type="button">Export JSON</button>
 </section>
 
 
@@ -56,7 +60,7 @@
       <thead><tr>
         <th>#</th><th>Protocol</th><th>Category</th><th>Chains</th>
         <th class="num">TVL</th><th class="num">7d</th><th class="num">Age</th>
-        <th class="num">Implied value</th><th></th>
+        <th class="num">Implied value</th><th class="num">Rank range</th><th></th>
       </tr></thead>
       <tbody id="rows"></tbody>
     </table>
@@ -64,6 +68,12 @@
   </section>
   <aside class="detail" id="detail" aria-label="Protocol detail"></aside>
 </main>
+
+<section class="comparewrap" aria-label="Compare protocols">
+  <h2>Compare — up to three protocols side by side</h2>
+  <p>Use the Compare button on a board row to add it here. The table lines up the two things that decide a farm: the value model and the farm's netted economics.</p>
+  <div id="compare"></div>
+</section>
 
 <section class="model" aria-label="Model sandbox">
   <div>
@@ -123,7 +133,8 @@
     <li><b>Start at the top.</b> Rank 1 is the board's most valuable pre-token protocol under the model below.</li>
     <li><b>Check the maths.</b> Open a protocol: its detail shows the fitted size curve (log market cap = a + b × log TVL, plus a fitted shift for bridges, fitted on listed protocols that are not exchanges after trimming outliers), its launch odds (an ensemble of its age-band-and-category rate and a logistic model), growth, maturity and chains — multiplied into the implied value. Every number comes from the snapshot.</li>
     <li><b>Farm it.</b> Each protocol carries seven concrete steps with a cost and a time — the seventh is the exit rule — plus the farm's economics on a $1,000 deposit: expected value, gas, the T-bill yield forgone, net, net per hour and the break-even launch odds. Never pay to claim: claim only from the protocol's own page.</li>
-    <li><b>Compare.</b> The live-token table shows what the market already pays per TVL dollar in each category — that is the model's anchor.</li>
+    <li><b>Compare.</b> The live-token table shows what the market already pays per TVL dollar in each category — that is the model's anchor. The compare view lines up to three protocols side by side, and Export CSV / Export JSON downloads the board you are looking at.</li>
+    <li><b>Mind the range.</b> Every row carries a rank range from 200 bootstrap refits of the size curve: a row ranked 12th whose range is 8–31 is a row the curve cannot place precisely, and the board says so instead of hiding it. The detail view also shows the five listed protocols closest to it in category and size — its comparables — so you can check the curve against real market caps.</li>
   </ol>
   <p class="note">A protocol is listed as pre-token because its snapshot record carries no token — not as proof it has none. Implied value is this radar's claim, not a prediction that a token will launch or what it will trade at.</p>
 </section>

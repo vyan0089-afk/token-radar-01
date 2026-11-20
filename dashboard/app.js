@@ -9,7 +9,7 @@
   // (every row at or above the floor) plus early finds below the floor, so
   // TVL at or above the floor marks a watchlist row. board.json's coverage
   // is what the gate checks; this is only the page's badge.
-  var state = { q: '', cat: '', chain: '', scope: 'all', sort: 'rank', shown: 100, sel: null, scale: 1, gw: D.model.growth_weight, deposit: 1000, farmed: D.model.farmed_fraction, tbill: D.model.tbill_rate, sandbox: false };
+  var state = { q: '', cat: '', chain: '', scope: 'all', sort: 'rank', shown: 100, sel: null, scale: 1, gw: D.model.growth_weight, deposit: 1000, farmed: D.model.farmed_fraction, tbill: D.model.tbill_rate, sandbox: false, compare: [] };
 
   function $(id) { return document.getElementById(id); }
   function money(n) {
@@ -64,6 +64,19 @@
       if (!best || e.perHour > best.e.perHour) best = { r: r, e: e };
     });
     return best;
+  }
+
+  function renderStrip() {
+    var total = D.accounting.reduce(function (s, a) { return s + a.count; }, 0);
+    var withToken = D.accounting.filter(function (a) { return a.label.indexOf('Already has a token') === 0 || a.label.indexOf('Has a token symbol') === 0; }).reduce(function (s, a) { return s + a.count; }, 0);
+    var rankable = D.board_size + (D.accounting.filter(function (a) { return a.label.indexOf('Pre-token and rankable') === 0; })[0] || { count: 0 }).count;
+    $('strip').innerHTML =
+      '<div><span class="k">Snapshot</span><b>' + total + '</b><span class="k">protocols, every one counted once</span></div>' +
+      '<div><span class="k">Ranked</span><b>' + D.board_size + '</b><span class="k">' + D.watchlist_size + ' watchlist + ' + D.early_size + ' early</span></div>' +
+      '<div><span class="k">Rankable pre-token</span><b>' + rankable + '</b><span class="k">of which ' + (rankable - D.board_size) + ' sit above the floor, off the watchlist</span></div>' +
+      '<div><span class="k">Already has a token</span><b>' + withToken + '</b><span class="k">their market caps train the curve</span></div>' +
+      '<div><span class="k">Bootstrap refits</span><b>' + D.bootstrap_draws + '</b><span class="k">behind every rank range</span></div>' +
+      '<div><span class="k">Integrity</span><b>' + total + ' = ' + D.protocols_total + '</b><span class="k">buckets sum to the snapshot</span></div>';
   }
 
   function renderKPI() {
@@ -216,7 +229,8 @@
         '<td class="num ' + cls + '">' + pct(r.change_7d) + '</td>' +
         '<td class="num">' + ageFmt(r.age_days) + '</td>' +
         '<td class="num"><b>' + money(implied(r)) + '</b></td>' +
-        '<td><button type="button" data-farm="' + esc(r.slug) + '">Farm plan</button></td></tr>';
+        '<td class="num">' + r.rank_lo + '–' + r.rank_hi + '</td>' +
+        '<td><button type="button" data-farm="' + esc(r.slug) + '">Farm plan</button> <button type="button" data-cmp="' + esc(r.slug) + '">' + (state.compare.indexOf(r.slug) >= 0 ? '✓ Compare' : 'Compare') + '</button></td></tr>';
     }).join('');
     $('more').style.display = list.length > state.shown ? '' : 'none';
     Array.prototype.forEach.call(document.querySelectorAll('#rows tr'), function (tr) {
@@ -225,6 +239,102 @@
     Array.prototype.forEach.call(document.querySelectorAll('[data-farm]'), function (b) {
       b.addEventListener('click', function (e) { e.stopPropagation(); select(b.getAttribute('data-farm')); });
     });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-cmp]'), function (b) {
+      b.addEventListener('click', function (e) { e.stopPropagation(); toggleCompare(b.getAttribute('data-cmp')); });
+    });
+  }
+
+  function toggleCompare(slug) {
+    var i = state.compare.indexOf(slug);
+    if (i >= 0) state.compare.splice(i, 1);
+    else if (state.compare.length < 3) state.compare.push(slug);
+    else state.compare = [state.compare[1], state.compare[2], slug];
+    renderRows(); renderCompare();
+  }
+
+  function rowBySlug(slug) {
+    for (var i = 0; i < rows.length; i++) if (rows[i].slug === slug) return rows[i];
+    return null;
+  }
+
+  function renderCompare() {
+    var el = $('compare');
+    var sel = state.compare.map(rowBySlug).filter(function (r) { return r !== null; });
+    if (sel.length === 0) {
+      el.innerHTML = '<p class="empty">Nothing selected yet — pick up to three protocols from the board.</p>';
+      return;
+    }
+    function metric(label, fn, num) {
+      return '<tr><td>' + label + '</td>' + sel.map(function (r) { return '<td class="' + (num ? 'num' : '') + '">' + fn(r) + '</td>'; }).join('') + '</tr>';
+    }
+    el.innerHTML = '<table><thead><tr><th></th>' + sel.map(function (r) {
+      return '<th>' + esc(r.name) + ' <button type="button" data-uncmp="' + esc(r.slug) + '" aria-label="Remove">×</button></th>';
+    }).join('') + '</tr></thead><tbody>' +
+      metric('Rank', function (r) { return '#' + r.rank + ' <span style="color:var(--muted)">(' + r.rank_lo + '–' + r.rank_hi + ')</span>'; }, true) +
+      metric('Implied value', function (r) { return '<b>' + money(implied(r)) + '</b>'; }, true) +
+      metric('Implied P10–P90 (bootstrap)', function (r) { return money(r.implied_lo) + ' – ' + money(r.implied_hi); }, true) +
+      metric('TVL', function (r) { return money(r.tvl_usd); }, true) +
+      metric('7-day growth', function (r) { return pct(r.change_7d); }, true) +
+      metric('Age', function (r) { return ageFmt(r.age_days); }, true) +
+      metric('Fitted curve value', function (r) { return money(r.curve_value); }, true) +
+      metric('Launch odds', function (r) { return (r.launch_odds * 100).toFixed(1) + '%'; }, true) +
+      metric('Net on $1,000', function (r) { var e = econ(r, 1000, state.farmed, state.tbill); return fmtUsd(e.net); }, true) +
+      metric('Net per hour', function (r) { var e = econ(r, 1000, state.farmed, state.tbill); return '<b>' + fmtUsd(e.perHour) + '</b>'; }, true) +
+      metric('Break-even odds', function (r) { var e = econ(r, 1000, state.farmed, state.tbill); return (e.breakeven * 100).toFixed(1) + '%'; }, true) +
+      metric('Verdict', function (r) { var e = econ(r, 1000, state.farmed, state.tbill); return '<b>' + e.verdict + '</b>'; }, true) +
+      metric('Review by', function (r) { return r.economics.review_date; }, true) +
+      '</tbody></table>';
+    Array.prototype.forEach.call(document.querySelectorAll('[data-uncmp]'), function (b) {
+      b.addEventListener('click', function () { toggleCompare(b.getAttribute('data-uncmp')); });
+    });
+  }
+
+  function download(filename, text, type) {
+    var blob = new Blob([text], { type: type });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function csvCell(v) {
+    var s = String(v === null || v === undefined ? '' : v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  function exportCsv() {
+    var list = filtered();
+    var head = ['rank', 'slug', 'name', 'category', 'chains', 'tvl_usd', 'change_7d', 'age_days', 'implied_value_usd', 'implied_lo', 'implied_hi', 'rank_lo', 'rank_hi', 'launch_odds', 'net_usd_1000', 'net_per_hour_usd', 'breakeven_odds', 'verdict', 'review_date'];
+    var lines = [head.join(',')];
+    list.forEach(function (r) {
+      var e = econ(r, 1000, state.farmed, state.tbill);
+      lines.push([r.rank, r.slug, r.name, r.category || '', r.chains.join(';'), r.tvl_usd, r.change_7d === null ? '' : r.change_7d, r.age_days === null ? '' : r.age_days, implied(r), r.implied_lo, r.implied_hi, r.rank_lo, r.rank_hi, r.launch_odds.toFixed(4), e.net.toFixed(2), e.perHour.toFixed(2), e.breakeven.toFixed(4), e.verdict, r.economics.review_date].map(csvCell).join(','));
+    });
+    download('token-radar-board.csv', lines.join('\n') + '\n', 'text/csv');
+  }
+
+  function exportJson() {
+    var list = filtered();
+    download('token-radar-board.json', JSON.stringify(list.map(function (r) {
+      var e = econ(r, 1000, state.farmed, state.tbill);
+      return { rank: r.rank, slug: r.slug, name: r.name, category: r.category, chains: r.chains, tvl_usd: r.tvl_usd, change_7d: r.change_7d, age_days: r.age_days, implied_value_usd: implied(r), implied_lo: r.implied_lo, implied_hi: r.implied_hi, rank_lo: r.rank_lo, rank_hi: r.rank_hi, launch_odds: r.launch_odds, net_usd_1000: Math.round(e.net * 100) / 100, net_per_hour_usd: Math.round(e.perHour * 100) / 100, breakeven_odds: Math.round(e.breakeven * 10000) / 10000, verdict: e.verdict, review_date: r.economics.review_date };
+    }), null, 2) + '\n', 'application/json');
+  }
+
+  // The five listed protocols nearest a row: same category first, then
+  // closest by log TVL. Their market caps are the curve's training data.
+  function compsRows(r) {
+    var x = Math.log10(r.tvl_usd);
+    var scored = D.listed.map(function (p) {
+      return { p: p, score: (p.category === r.category ? 0 : 2) + Math.abs(Math.log10(p.tvl_usd) - x) };
+    });
+    scored.sort(function (a, b) { return a.score - b.score || (a.p.slug < b.p.slug ? -1 : 1); });
+    return scored.slice(0, 5).map(function (s) {
+      var p = s.p;
+      return '<tr><td>' + esc(p.name) + '</td><td class="num">' + money(p.tvl_usd) + '</td><td class="num">' + money(p.mcap_usd) + '</td><td class="num">' + (p.mcap_usd / p.tvl_usd).toFixed(2) + '×</td></tr>';
+    }).join('');
   }
 
   function renderDetail() {
@@ -263,6 +373,7 @@
       '<tr><td>Chains (' + r.chains.length + ')</td><td class="num">× ' + r.chain_multiplier + '</td></tr>' +
       '<tr><td><b>Implied value</b></td><td class="num"><b>' + money(implied(r)) + '</b></td></tr>' +
       '<tr><td>P10–P90 range<br><span style="color:var(--muted);font-size:12px">from the backtest residuals for its age group</span></td><td class="num">' + money(Math.round(implied(r) * Math.pow(10, rq.log_q10))) + ' – ' + money(Math.round(implied(r) * Math.pow(10, rq.log_q90))) + '</td></tr>' +
+      '<tr><td>Bootstrap P10–P90<br><span style="color:var(--muted);font-size:12px">implied value over ' + D.bootstrap_draws + ' refits of the size curve; rank ' + r.rank_lo + '–' + r.rank_hi + '</span></td><td class="num">' + money(r.implied_lo) + ' – ' + money(r.implied_hi) + '</td></tr>' +
       '</tbody></table>' +
       '<p class="sub">Sandbox ' + (state.sandbox ? 'active — values above use your sliders and what-if controls.' : 'off — values are the submitted board.') + '</p>' +
       '<h3>Farm economics — ' + depLabel + ' deposit</h3>' +
@@ -274,8 +385,15 @@
       '<tr><td><b>Net per ' + depLabel + '</b></td><td class="num"><b>' + fmtUsd(e.net) + '</b></td></tr>' +
       '<tr><td><b>Net per hour</b></td><td class="num"><b>' + fmtUsd(e.perHour) + '</b></td></tr>' +
       '<tr><td>Break-even launch odds</td><td class="num">' + (e.breakeven * 100).toFixed(1) + '% (model: ' + (r.launch_odds * 100).toFixed(1) + '%)</td></tr>' +
+      '<tr><td>Timeline</td><td class="num">snapshot ' + esc(D.as_of) + ' · hold ' + r.economics.hold_days + ' days · review by ' + r.economics.review_date + '</td></tr>' +
       '</tbody></table>' +
       '<p class="sub">Assumptions, stated: airdrop pool ' + (D.model.airdrop_pool * 100).toFixed(0) + '% of implied value; farmed capital ' + (state.farmed * 100).toFixed(0) + '% of TVL; your share is ' + depLabel + ' of that farmed capital.</p>' +
+      '<h3>Comparables — the five listed protocols nearest it</h3>' +
+      '<p class="sub">Same category first, then closest by TVL. Their market caps are the curve\'s training data: if ' + esc(r.name) + '\'s implied value per TVL dollar sits far from its comparables, that is where the model is stretching.</p>' +
+      '<table><thead><tr><th>Protocol</th><th class="num">TVL</th><th class="num">Market cap</th><th class="num">Mcap / TVL</th></tr></thead><tbody>' +
+      compsRows(r) +
+      '<tr><td><b>' + esc(r.name) + ' (implied)</b></td><td class="num">' + money(r.tvl_usd) + '</td><td class="num">' + money(implied(r)) + '</td><td class="num">' + (implied(r) / r.tvl_usd).toFixed(2) + '×</td></tr>' +
+      '</tbody></table>' +
       '<h3>Farm plan — seven concrete steps</h3><ol>' + steps + '</ol>' +
       '<p class="sub">Snapshot ' + esc(D.as_of) + '. This record carries no token: farm it only with money you can leave in place for the holding period above.</p>';
   }
@@ -295,13 +413,14 @@
       D.board_size + ' ranked · ' + D.watchlist_size + ' watchlist · ' + D.early_size + ' early finds<br>' +
       'Top: <b>' + esc(top ? top.name : '—') + '</b> at ' + money(top ? top.implied_value_usd : 0);
     $('modelver').textContent = '· ' + D.model_version;
-    $('modeltext').textContent = 'Implied value = fitted curve value (log market cap = a + b × log TVL, plus a fitted shift for bridges, fitted on listed protocols that are not exchanges after trimming outliers more than 2.5 robust deviations from a plain curve) × launch odds (an ensemble of the share of protocols in its age band and category that have a token, and a logistic regression on age band and category) × growth × maturity × chains. ' +
+    $('modeltext').textContent = 'Implied value = fitted curve value (log market cap = a + b × log TVL, plus a fitted shift for bridges, fitted on listed protocols that are not exchanges after trimming outliers more than 2.5 robust deviations from a plain curve) × launch odds (an ensemble of the share of protocols in its age band and category that have a token, and a logistic regression on age band, category, log TVL, 7-day growth, chain count and log age) × growth × maturity × chains. ' +
       'Growth is the 7-day TVL change clamped to −60…+120% at weight ' + D.model.growth_weight + '; maturity runs 0.6–1.0 over ' + D.model.maturity_days + ' days. ' +
-      'Move the sliders to test the model, and the what-if controls to re-price the farms at another deposit, farmed-capital share or T-bill rate — the board re-ranks live.';
+      'Move the sliders to test the model, and the what-if controls to re-price the farms at another deposit, farmed-capital share or T-bill rate — the board re-ranks live. ' +
+      'Every row also carries a rank range from ' + D.bootstrap_draws + ' bootstrap refits of the size curve, and the detail view shows its five nearest listed comparables.';
     $('foot').textContent = 'Source: ' + D.source + ' · Watchlist floor ' + money(D.floor_usd) + ' TVL · ' + D.board_size + ' protocols ranked · Model ' + D.model_version + ' · Built by main.ts from the sealed snapshot; no network, no live prices.';
   }
 
-  function renderAll() { renderKPI(); renderValidation(); renderAccounting(); renderScatter(); renderSpot(); renderRows(); renderDetail(); renderLive(); renderMeta(); }
+  function renderAll() { renderStrip(); renderKPI(); renderValidation(); renderAccounting(); renderScatter(); renderSpot(); renderRows(); renderDetail(); renderLive(); renderMeta(); renderCompare(); }
 
   function select(slug) {
     state.sel = slug;
@@ -354,6 +473,8 @@
     $('q').value = ''; $('cat').value = ''; $('chain').value = ''; $('scope').value = 'all'; $('sort').value = 'rank';
     renderRows();
   });
+  $('exportCsv').addEventListener('click', function () { exportCsv(); });
+  $('exportJson').addEventListener('click', function () { exportJson(); });
   $('more').addEventListener('click', function () { state.shown += 100; renderRows(); });
   $('scale').addEventListener('input', function () {
     state.scale = parseFloat($('scale').value); $('oScale').textContent = state.scale.toFixed(2);

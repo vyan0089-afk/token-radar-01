@@ -13,15 +13,21 @@ h1{margin:0;font-size:30px;letter-spacing:-.5px}
 .tag{margin:4px 0 0;color:var(--muted);max-width:560px}
 .meta{text-align:right;color:var(--muted);font-size:13px;line-height:1.7}
 .meta b{color:var(--text)}
-.kpi{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;padding:16px 28px 4px}
-.kpi div{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:2px}
-.kpi .k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
-.kpi b{font-size:22px}
+.kpi,.strip{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;padding:16px 28px 4px}
+.kpi div,.strip div{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:2px}
+.kpi .k,.strip .k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.kpi b,.strip b{font-size:22px}
+.comparewrap{margin:6px 28px 4px;padding:14px 16px;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+.comparewrap h2{margin:0 0 6px;font-size:17px}
+.comparewrap p{margin:0 0 8px;color:var(--muted);font-size:14px}
+.comparewrap .empty{color:var(--muted)}
+.comparewrap button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:1px 8px;font:inherit;cursor:pointer}
+.comparewrap th{white-space:nowrap}
 .valid{margin:6px 28px 4px;padding:14px 16px;background:var(--panel);border:1px solid var(--line);border-radius:12px}
 .valid h2{margin:0 0 6px;font-size:17px}
 .valid p{margin:0 0 8px;color:var(--muted);font-size:14px}
 .valid table{margin-bottom:8px}
-@media (max-width:900px){.kpi{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:900px){.kpi,.strip{grid-template-columns:repeat(2,1fr)}}
 .spot{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:16px 28px 4px}
 .spot article{background:linear-gradient(160deg,var(--panel2),var(--panel));
   border:1px solid var(--line);border-radius:12px;padding:14px 16px;cursor:pointer}
@@ -73,6 +79,9 @@ tbody tr.sel{background:var(--panel2);box-shadow:inset 3px 0 var(--accent)}
   border:1px solid var(--line);color:var(--muted)}
 .badge.watch{color:var(--accent);border-color:var(--accent)}
 .badge.early{color:var(--warn);border-color:var(--warn)}
+#board button{background:var(--panel2);color:var(--text);border:1px solid var(--line);
+  border-radius:8px;padding:6px 10px;font:inherit;cursor:pointer;white-space:nowrap}
+#board button:hover{border-color:var(--accent)}
 #more{margin:10px 0;background:var(--panel);color:var(--text);border:1px solid var(--line);
   border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer}
 .detail{background:var(--panel);border:1px solid var(--line);border-radius:12px;
