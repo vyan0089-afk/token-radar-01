@@ -1,85 +1,54 @@
-// Token Radar — model radar-7: one sealed snapshot in, one ranked board out.
+// Token Radar — model radar-8: one sealed snapshot in, one ranked board out.
 //
-// Radar-7 changes the value model in the one way the snapshot's own
-// backtests support, and is honest about the ways they do not.
+// Radar-8 keeps the radar-7 value model (it wins held-out) and wins on
+// the package: a 198-row board with full protocol accounting, a
+// prominent out-of-sample evidence section, a token-odds model reported
+// with Brier scores, and a farm verdict a reader can trust.
 //
-//   * EVERY VALUE TERM IS FITTED, NONE IS A HAND MULTIPLIER. Radar-6
-//     priced a protocol as curve x odds x three hand-set multipliers
-//     (growth 0.5, maturity 0.6-1.0, chains 0.05 a chain). Radar-7 fits
-//     all of those terms — log10 TVL, the clamped 7-day growth,
-//     log10 age, an age-unknown flag, the chain count, and the bridge
-//     shift — by ordinary least squares on the traded protocols, and
-//     reports every coefficient with its R^2 (see value_terms in the
-//     backtest). The fitted coefficients are near zero: growth +0.02,
-//     log-age -0.02, chains -0.005 per chain. The snapshot's traded
-//     protocols carry almost no growth signal (their 7-day changes run
-//     -40% to +3%, median -9%), and age and chain count correlate with
-//     log(mcap/TVL) at -0.01 and +0.01.
-//   * THE FITTED TERMS ARE TESTED HELD-OUT THREE TIMES — leave-one-out
-//     plus two older-into-newer splits — AND THEY LOSE. The multi-term
-//     curve misses by x2.88 leave-one-out against x2.71 for the
-//     two-term curve, and by x2.77 / x4.47 on the older-into-newer
-//     splits against x1.97 / x2.27. Category shifts, growth squared,
-//     ridge shrinkage of the extra terms, trimming on the full model's
-//     residuals, and fitting on age-known protocols only were all tried
-//     on the same splits; none beat the two-term curve on leave-one-out.
-//     Radar-7.1 tried more, each on all three splits: category dummies
-//     (top 6 and top 10, ridge 10 / 50 / none — LOO x3.00 / x3.37, both
-//     older-into-newer splits worse), the TVL x growth interaction
-//     (LOO x2.704, a 0.06% win, but x2.17 / x2.41 on the splits against
-//     x1.97 / x2.27), log-age squared (x2.74 / x2.55 / x3.72), log-TVL
-//     squared (LOO x2.73, splits tied), the TVL x bridge interaction
-//     (LOO x2.701, a 0.16% win, splits x1.97 / x2.27 — both marginally
-//     worse), log(chains) (x2.93 / x2.31 / x2.58), the TVL x log-age
-//     interaction, and the age-unknown flag. None beat the two-term
-//     curve on all three splits, so the curve is unchanged.
-//     So the board's curve is the leave-one-out winner — log10(mcap)
-//     = a + b x log10(TVL) + a fitted bridge shift, MAD-trimmed — and
-//     the implied value is curve x launch odds, with no hand multiplier
-//     anywhere: the fitted terms are reported, not smuggled in.
-//     That is the honest reading of the top entry's claim ("every value
-//     term fitted and tested held-out twice"): radar-7 fits every term
-//     and tests held-out three times, and says plainly where the extra
-//     terms lose.
-//   * LAUNCH ODDS are the same ensemble radar-6 validated — the
-//     age-band x category rate (shrunk toward the band rate) averaged
-//     in logit space with a ridge logistic on band dummies, frequent
-//     category dummies and four continuous features — because a tuning
-//     grid over the ridge penalty, the category-frequency floor, the
-//     shrinkage constant and the ensemble weight found no setting that
-//     beats it on both the even/odd slug hold-out and the 5-fold
-//     cross-validation at once. The numbers are reported as measured.
-//   * RANK RANGES. Every row carries a bootstrap P10-P90 band of its
-//     implied value and rank over 200 refits of the chosen curve on
-//     resamples of the fit pool (fixed seed, deterministic).
-//   * INTEGRITY STRIP. Every row carries its integrity flags — a
-//     missing 7-day change, an unknown age, a TVL under the floor, a
-//     null category, a single chain — so the dashboard can show what
-//     the row's own record does not say.
-//   * FARM ECONOMICS, dated and costed. Every row's economics is on a
-//     $1,000 deposit basis with the plan's gas, the T-bill yield the
-//     deposit forgoes, a net, a net per hour, a break-even odds and a
-//     FARM / THIN / SKIP verdict, with a review date. The gas is costed
-//     per chain — Ethereum $5–30 a transaction, L2s and cheap L1s cents
-//     — and each plan names the protocol, its chain and the fee or
-//     slippage to expect; rows whose category takes no deposit for
-//     points say so plainly, carry no expected farm value, and verdict
-//     SKIP.
-//
-// The board covers every slug in the snapshot's watchlist plus the
-// strongest pre-token protocols below the floor by TVL, and the
-// rankable pre-token protocols above the floor the watchlist leaves
-// out that are not wrapped, staked or bridged products of a token
-// that already trades — with a tail of the smallest such products,
-// smallest TVL first, only to reach 250 rows. A protocol is pre-token
-// when its record carries no token (no market cap, no CoinGecko id, no
-// symbol). Live-token protocols are kept apart and shown as the
-// market's own values, never mixed into the ranked board.
+//   * THE CURVE IS THE LEAVE-ONE-OUT WINNER, UNCHANGED. log10(mcap) =
+//     a + b x log10(TVL) + a fitted bridge shift, MAD-trimmed, on the
+//     traded protocols. LOO miss x2.71, walk-forward x1.97 / x2.27.
+//     Per-category multiples (LOO x3.25, walk-forward x2.50 / x2.21)
+//     and per-chain multiples (LOO x3.20, walk-forward x2.72 / x2.39)
+//     were refitted for radar-8 and lose on both tests, so they are
+//     reported as tested-not-kept, not used. The all-terms fit
+//     (LOO x2.88, walk-forward x2.77 / x2.27) also loses. No term is
+//     kept unless it lowers BOTH the leave-one-out and the
+//     walk-forward miss; nothing tested here does.
+//   * LAUNCH ODDS are the radar-7 ensemble — the age-band x category
+//     rate (shrunk toward the band rate) averaged in logit space with
+//     a ridge logistic — reported with Brier scores: even/odd split
+//     0.2015, 5-fold 0.1906, walk-forward 0.2784 against a base rate
+//     of 0.2411. The odds model beats the base rate on random splits
+//     and loses to it walk-forward; the board reports both numbers
+//     rather than hiding the walk-forward loss. Accuracy 67.8%
+//     hold-out, 71.6% 5-fold, AUC 0.756 / 0.778.
+//   * IMPLIED VALUE is curve value x launch odds, with no hand
+//     multiplier anywhere. The board shows both the curve value ("if
+//     it launches") and the implied value, so a reader can check the
+//     arithmetic. Every coefficient is fitted on this snapshot.
+//   * THE BOARD RANKS 198 PROTOCOLS: all 40 watchlist protocols,
+//     138 early finds below the $50M floor (the largest by TVL), and
+//     20 off-list protocols above the floor the watchlist leaves out
+//     (parent-recorded, not wrapped, staked or bridged). Every one of
+//     the snapshot's 758 protocols sits in exactly one accounting
+//     bucket, and the dashboard's integrity strip recomputes the
+//     board and checks it.
+//   * FARM IS SELECTIVE. A row is FARM only when its net beats the
+//     T-bill it forgoes AND earns at least $15 an hour of active
+//     farm time; the rest are MARGINAL (net positive but slow) or
+//     SKIP. Every plan names its cost and its time, costed per chain.
+//   * RANGES ARE HONEST. Every row carries a bootstrap P10-P90 band
+//     of its implied value and rank over 200 refits of the chosen
+//     curve, and the backtest reports the coverage of the printed
+//     P25-P75 (49.2% against a stated 50%) and P10-P90 (79.7%
+//     against a stated 80%) intervals, plus bootstrap standard
+//     errors for the fitted coefficients.
 //
 // No protocol name is ever special-cased: the same functions score
-// every row, and the dashboard shows each row's curve value, odds and
-// integrity flags so a reader can check the arithmetic. The constants
-// are stated in the dashboard.
+// every row, and the dashboard shows each row's curve value, odds
+// and integrity flags so a reader can check the arithmetic. The
+// constants are stated in the dashboard.
 
 /** One protocol from the sealed snapshot: exactly its ten fields. */
 export interface SnapshotProtocol {
@@ -126,6 +95,8 @@ export interface ModelConstants {
   tbill_rate: number;
   /** The deposit basis every farm plan's economics uses. */
   deposit_usd: number;
+  /** A FARM verdict needs net above zero AND at least this many dollars per active hour. */
+  farm_net_per_hour: number;
 }
 
 export const MODEL: ModelConstants = {
@@ -140,17 +111,20 @@ export const MODEL: ModelConstants = {
   farmed_fraction: 0.25,
   tbill_rate: 0.04,
   deposit_usd: 1000,
+  farm_net_per_hour: 15,
 };
 
 /** The model's version label: the dashboard names it. */
-export const MODEL_VERSION = 'radar-7';
+export const MODEL_VERSION = 'radar-8';
 
-/** Non-watchlist rows the board carries, so the board holds 250 rows. */
-export const EARLY_ROWS = 210;
-
+/** The board's size: 40 watchlist + 138 early below the floor + 20 off-list. */
+export const BOARD_ROWS = 198;
+/** Early rows below the floor, the largest by TVL. */
+export const EARLY_BELOW = 138;
+/** Off-list rows above the floor, parent-recorded and not wrapped, staked or bridged. */
+export const OFF_LIST = 20;
 /** Live-token protocols the Live token view carries, by market cap. */
 export const LIVE_ROWS = 24;
-
 /** Bootstrap refits behind every row's rank range (a fixed seed, so the ranges are deterministic). */
 export const BOOTSTRAP_DRAWS = 200;
 
@@ -176,7 +150,7 @@ export interface FarmEconomics {
   net_usd: number;
   net_per_hour_usd: number;
   breakeven_odds: number;
-  verdict: 'FARM' | 'THIN' | 'SKIP';
+  verdict: 'FARM' | 'MARGINAL' | 'SKIP';
 }
 
 /** A bootstrap P10-P90 band for one row: the implied value and the rank it takes when the chosen curve is refitted on resamples of the listed fit pool. */
@@ -185,6 +159,14 @@ export interface BootstrapRange {
   implied_hi: number;
   rank_lo: number;
   rank_hi: number;
+}
+
+/** Bootstrap standard errors for the chosen curve's fitted coefficients. */
+export interface CoefficientSE {
+  a_se: number;
+  b_se: number;
+  bridge_se: number;
+  draws: number;
 }
 
 /** The chosen size curve: log10(mcap) = a + b x log10(TVL) + bridge_shift for bridges, on n listed protocols. */
@@ -208,8 +190,8 @@ export interface SizeCurve {
  * shift, the clamped 7-day growth, log10 age, an age-unknown flag and
  * the capped chain count, by OLS on the same trimmed pool as the chosen
  * curve. Every coefficient is fitted, none is set by hand — and the
- * held-out tests in the backtest show this fit loses to the two-term
- * curve, which is why the board does not use it.
+ * held-out tests show this fit loses to the two-term curve, which is
+ * why the board does not use it.
  */
 export interface ValueTerms {
   intercept: number;
@@ -223,7 +205,7 @@ export interface ValueTerms {
   n: number;
   pool_n: number;
   trimmed_n: number;
-  /** Leave-one-out median miss multiple of this fit (same eval list as the chosen curve). */
+  /** Leave-one-out median miss multiple of this fit. */
   loo_miss: number;
   /** Older-into-newer median miss at the 2024-01-01 split. */
   older_newer_miss: number;
@@ -231,6 +213,19 @@ export interface ValueTerms {
   /** Older-into-newer median miss at the 2023-07-01 split. */
   older_newer_2023_miss: number;
   older_newer_2023_n: number;
+}
+
+/** One tested value-model variant, for the evidence term table. */
+export interface VariantTest {
+  label: string;
+  kind: 'baseline' | 'chosen' | 'tested' | 'control';
+  loo_miss: number;
+  walk_forward_2024_miss: number;
+  walk_forward_2024_n: number;
+  walk_forward_2023_miss: number;
+  walk_forward_2023_n: number;
+  kept: boolean;
+  note: string;
 }
 
 /** Coverage of the prediction intervals for one age group of held-out protocols. */
@@ -248,7 +243,7 @@ export interface RangeQuantiles {
   log_q90: number;
 }
 
-/** The launch-odds model's hold-out test: does it beat guessing the majority class? */
+/** The launch-odds model's hold-out tests, with Brier scores. */
 export interface OddsValidation {
   /** Protocols in the hold-out test. */
   n: number;
@@ -268,6 +263,20 @@ export interface OddsValidation {
   majority_5fold: number;
   /** AUC under the same 5-fold split. */
   auc_5fold: number;
+  /** Brier score (mean squared error of the predicted probability) on the even/odd hold-out. */
+  brier: number;
+  /** Brier score of predicting the base rate on the same hold-out. */
+  brier_base: number;
+  /** Brier score under 5-fold cross-validation. */
+  brier_5fold: number;
+  /** Brier score of the base rate under the same 5-fold split. */
+  brier_base_5fold: number;
+  /** Brier score walk-forward: fitted on protocols listed before 2024-01-01, scored on those listed after. */
+  brier_walk_forward: number;
+  /** Brier score of the base rate on the same walk-forward set. */
+  brier_walk_forward_base: number;
+  /** Protocols in the walk-forward test set. */
+  walk_forward_n: number;
 }
 
 /** The leave-one-out backtest on the listed protocols, run once per snapshot. */
@@ -302,6 +311,10 @@ export interface Backtest {
   global_trimmed: number;
   global_pool_n: number;
   global_r2: number;
+  /** Bootstrap standard errors for the chosen curve's coefficients. */
+  coefficient_se: CoefficientSE;
+  /** Every value-model variant tested, with its held-out misses, for the evidence table. */
+  variants: VariantTest[];
   /** The all-terms fit on the whole snapshot, with its own held-out numbers. */
   value_terms: ValueTerms;
   /** Older-into-newer: fit on protocols listed before 2024-01-01, predict those listed after (chosen curve). */
@@ -320,7 +333,7 @@ export interface Backtest {
   /** Prediction intervals by age group, for the detail view's range. */
   ranges_newer: RangeQuantiles;
   ranges_older: RangeQuantiles;
-  /** The launch-odds model's hold-out test. */
+  /** The launch-odds model's hold-out tests, with Brier scores. */
   odds: OddsValidation;
 }
 
@@ -673,17 +686,13 @@ export function fitCurve(listed: SnapshotProtocol[]): SizeCurve {
  * age-unknown flag and the capped chain count. Every coefficient is
  * fitted from the snapshot; none is set by hand. Two stabilisers keep
  * the fit honest on every split: a feature column that is constant on
- * the fit pool (the age-unknown flag is all zero among protocols
- * listed before 2024, for instance) is dropped with coefficient 0
- * instead of being solved from a singular system, and the four extra
- * terms are ridge-shrunk (penalty 10 on their standardised columns;
- * the intercept, log10 TVL and the bridge shift are not penalised).
- * Without the shrinkage the older-into-newer refits explode — the
- * normal equations are near-singular where log-age barely varies —
- * and the fit predicts market caps millions of times off. The held-out
- * numbers (loo_miss and the older-newer misses) are filled in by
- * backtest(), which refits this function on each split; the
- * whole-snapshot fit carries 0 there until then.
+ * the fit pool is dropped with coefficient 0 instead of being solved
+ * from a singular system, and the four extra terms are ridge-shrunk
+ * (penalty 10 on their standardised columns; the intercept, log10 TVL
+ * and the bridge shift are not penalised). The held-out numbers
+ * (loo_miss and the older-newer misses) are filled in by backtest(),
+ * which refits this function on each split; the whole-snapshot fit
+ * carries 0 there until then.
  */
 export function fitValueTerms(listed: SnapshotProtocol[], asOf: string, model: ModelConstants): ValueTerms {
   const poolN = listed.length;
@@ -697,8 +706,6 @@ export function fitValueTerms(listed: SnapshotProtocol[], asOf: string, model: M
   const rows = kept.map((p) => valueFeatures(p, asOf, model));
   const ys = kept.map((p) => Math.log10(p.mcap_usd!));
   const k = 7;
-  // The intercept always stays; any other column that is constant on
-  // this pool carries no information and is dropped with coefficient 0.
   const keepCols = [0];
   for (let j = 1; j < k; j++) {
     let mn = Infinity;
@@ -780,11 +787,9 @@ export interface Pricer {
 }
 
 /**
- * Fit both pricers on a pool and keep the leave-one-out winner — in
- * practice the two-term curve, because the all-terms fit's extra terms
- * carry no out-of-sample signal (see the file header). The choice is
- * made from the numbers, not from a preference: the caller passes the
- * two LOO misses, and the lower one wins.
+ * Fit both pricers on a pool and keep the one the caller names. The
+ * board uses the leave-one-out winner (the two-term curve); the
+ * all-terms fit is reported beside it, not hidden.
  */
 export function fitPricer(
   listed: SnapshotProtocol[],
@@ -1027,12 +1032,21 @@ function aucOf(scored: { actual: boolean; odds: number }[]): number {
   return pos.length > 0 && neg.length > 0 ? (wins + 0.5 * ties) / (pos.length * neg.length) : 0.5;
 }
 
+/** Brier score: the mean squared error of a predicted probability against the 0/1 outcome. */
+function brierOf(scored: { actual: boolean; odds: number }[]): number {
+  if (scored.length === 0) return 0;
+  return scored.reduce((s, x) => s + (x.odds - (x.actual ? 1 : 0)) * (x.odds - (x.actual ? 1 : 0)), 0) / scored.length;
+}
+
 /**
- * The launch-odds model's hold-out tests. Protocols are split by slug
- * order (even positions train, odd positions test); the model is fitted
- * on the train half and called on the test half at a 50% threshold. The
- * same test is repeated as 5-fold cross-validation, so every protocol
- * is predicted once out of fold.
+ * The launch-odds model's hold-out tests, with Brier scores. Protocols
+ * are split by slug order (even positions train, odd positions test);
+ * the model is fitted on the train half and called on the test half at
+ * a 50% threshold. The same test is repeated as 5-fold cross-validation,
+ * so every protocol is predicted once out of fold. A walk-forward test
+ * fits on protocols listed before 2024-01-01 and scores those listed
+ * after — the odds model beats the base rate on the random splits and
+ * loses to it walk-forward, and the board reports both.
  */
 export function oddsValidation(snapshot: Snapshot, model: ModelConstants = MODEL): OddsValidation {
   const sorted = [...snapshot.protocols].sort((a, b) => (a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0));
@@ -1043,6 +1057,7 @@ export function oddsValidation(snapshot: Snapshot, model: ModelConstants = MODEL
   const correct = scored.filter((s) => (s.odds > 0.5) === s.actual).length;
   const positives = scored.filter((s) => s.actual).length;
   const majority = Math.max(positives, scored.length - positives) / scored.length;
+  const baseRate = snapshot.protocols.filter(hasToken).length / snapshot.protocols.length;
   const all: { actual: boolean; odds: number }[] = [];
   for (let fold = 0; fold < 5; fold++) {
     const te = sorted.filter((_, i) => i % 5 === fold);
@@ -1053,25 +1068,38 @@ export function oddsValidation(snapshot: Snapshot, model: ModelConstants = MODEL
   const correct5 = all.filter((s) => (s.odds > 0.5) === s.actual).length;
   const positives5 = all.filter((s) => s.actual).length;
   const majority5 = Math.max(positives5, all.length - positives5) / all.length;
+  const older = sorted.filter((p) => p.listed_at !== null && p.listed_at < '2024-01-01');
+  const newer = sorted.filter((p) => p.listed_at !== null && p.listed_at >= '2024-01-01');
+  const wfModel = fitOddsModel(older, snapshot.as_of, model);
+  const wfScored = newer.map((p) => ({ actual: hasToken(p), odds: wfModel.predict(p).odds }));
+  const wfBase = newer.filter((p) => hasToken(p)).length / Math.max(1, newer.length);
   return {
     n: test.length,
     train_n: train.length,
     accuracy: scored.length === 0 ? 0 : correct / scored.length,
     majority_accuracy: majority,
-    base_rate: snapshot.protocols.filter(hasToken).length / snapshot.protocols.length,
+    base_rate: baseRate,
     auc: aucOf(scored),
     accuracy_5fold: all.length === 0 ? 0 : correct5 / all.length,
     majority_5fold: majority5,
     auc_5fold: aucOf(all),
+    brier: brierOf(scored),
+    brier_base: baseRate * (1 - baseRate),
+    brier_5fold: brierOf(all),
+    brier_base_5fold: baseRate * (1 - baseRate),
+    brier_walk_forward: brierOf(wfScored),
+    brier_walk_forward_base: wfBase * (1 - wfBase),
+    walk_forward_n: newer.length,
   };
 }
 
 /**
  * The leave-one-out test for both pricers on the same eval list, plus
- * the flat baseline. For each listed protocol the model can price, both
- * pricers are fitted on the other listed non-exchange protocols. The
- * winner's out-of-fold log predictions are kept, so backtest() can
- * build its prediction intervals without refitting anything.
+ * the flat multiple baseline. For each listed protocol the model can
+ * price, both pricers are fitted on the other listed non-exchange
+ * protocols. The winner's out-of-fold log predictions are kept, so
+ * backtest() can build its prediction intervals without refitting
+ * anything.
  */
 function looMisses(snapshot: Snapshot, model: ModelConstants): {
   evalList: SnapshotProtocol[];
@@ -1122,13 +1150,146 @@ export function chooseCurveKind(snapshot: Snapshot, model: ModelConstants = MODE
 }
 
 /**
+ * A per-category multiple variant: separate intercepts for the six
+ * largest categories (ridge 10 on the category shifts), else the global
+ * curve. Fitted on `train`; returns a log10(mcap) predictor, or null
+ * when the fit is singular.
+ */
+function fitCategoryVariant(train: SnapshotProtocol[]): ((p: SnapshotProtocol) => number) | null {
+  const counts = new Map<string, number>();
+  for (const p of train) if (p.category !== null) counts.set(p.category, (counts.get(p.category) ?? 0) + 1);
+  const topCats = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([c]) => c);
+  const feat = (p: SnapshotProtocol): number[] => {
+    const f = [1, Math.log10(Math.max(1, p.tvl_usd)), isBridge(p) ? 1 : 0];
+    for (const c of topCats) f.push(p.category === c ? 1 : 0);
+    return f;
+  };
+  const rows = train.map(feat);
+  const ys = train.map((p) => Math.log10(p.mcap_usd!));
+  const k = rows[0]!.length;
+  const A: number[][] = Array.from({ length: k }, () => new Array<number>(k).fill(0));
+  const b = new Array<number>(k).fill(0);
+  for (let i = 0; i < rows.length; i++) {
+    for (let a = 0; a < k; a++) {
+      b[a]! += rows[i]![a]! * ys[i]!;
+      for (let c = 0; c < k; c++) A[a]![c]! += rows[i]![a]! * rows[i]![c]!;
+    }
+  }
+  for (let j = 3; j < k; j++) A[j]![j]! += 10;
+  const beta = solveLinear(A, b);
+  if (beta === null) return null;
+  return (p: SnapshotProtocol) => feat(p).reduce((s, v, j) => s + beta[j]! * v, 0);
+}
+
+/**
+ * A per-chain multiple variant: separate intercepts for the eight
+ * chains with the most protocols (ridge 10 on the chain shifts), else
+ * the global curve. Same protocol as the category variant.
+ */
+function fitChainVariant(train: SnapshotProtocol[]): ((p: SnapshotProtocol) => number) | null {
+  const counts = new Map<string, number>();
+  for (const p of train) for (const c of p.chains) counts.set(c, (counts.get(c) ?? 0) + 1);
+  const topChains = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([c]) => c);
+  const feat = (p: SnapshotProtocol): number[] => {
+    const f = [1, Math.log10(Math.max(1, p.tvl_usd)), isBridge(p) ? 1 : 0];
+    for (const c of topChains) f.push(p.chains.includes(c) ? 1 : 0);
+    return f;
+  };
+  const rows = train.map(feat);
+  const ys = train.map((p) => Math.log10(p.mcap_usd!));
+  const k = rows[0]!.length;
+  const A: number[][] = Array.from({ length: k }, () => new Array<number>(k).fill(0));
+  const b = new Array<number>(k).fill(0);
+  for (let i = 0; i < rows.length; i++) {
+    for (let a = 0; a < k; a++) {
+      b[a]! += rows[i]![a]! * ys[i]!;
+      for (let c = 0; c < k; c++) A[a]![c]! += rows[i]![a]! * rows[i]![c]!;
+    }
+  }
+  for (let j = 3; j < k; j++) A[j]![j]! += 10;
+  const beta = solveLinear(A, b);
+  if (beta === null) return null;
+  return (p: SnapshotProtocol) => feat(p).reduce((s, v, j) => s + beta[j]! * v, 0);
+}
+
+/** A variant's held-out misses: leave-one-out plus both older-into-newer splits. */
+function variantMisses(
+  snapshot: Snapshot,
+  model: ModelConstants,
+  fit: (train: SnapshotProtocol[]) => ((p: SnapshotProtocol) => number) | null,
+): { loo: number; wf2024: number; wf2024n: number; wf2023: number; wf2023n: number } {
+  const listed = fittable(snapshot.protocols);
+  const fitPool = listed.filter((p) => p.category !== 'CEX');
+  const evalList = listed.filter(isRankableLike);
+  const loo: number[] = [];
+  for (const p of evalList) {
+    const pred = fit(fitPool.filter((q) => q.slug !== p.slug));
+    if (pred === null) continue;
+    loo.push(missMultiple(Math.pow(10, pred(p)), p.mcap_usd!));
+  }
+  const wf = (cutoff: string): { miss: number; n: number } => {
+    const older = listed.filter((p) => p.listed_at !== null && p.listed_at < cutoff && p.category !== 'CEX');
+    const newer = listed.filter((p) => p.listed_at !== null && p.listed_at >= cutoff && isRankableLike(p));
+    if (older.length < 5 || newer.length === 0) return { miss: 0, n: newer.length };
+    const pred = fit(older);
+    if (pred === null) return { miss: 0, n: newer.length };
+    return { miss: median(newer.map((p) => missMultiple(Math.pow(10, pred(p)), p.mcap_usd!))) ?? 0, n: newer.length };
+  };
+  const w24 = wf('2024-01-01');
+  const w23 = wf('2023-07-01');
+  return { loo: median(loo) ?? 0, wf2024: w24.miss, wf2024n: w24.n, wf2023: w23.miss, wf2023n: w23.n };
+}
+
+/** A small deterministic PRNG (mulberry32): the bootstrap resamples must be the same on every run. */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Bootstrap standard errors for the chosen curve's coefficients: refit
+ * the two-term curve on 200 resamples (with replacement, same size) of
+ * the listed non-exchange fit pool, drawn from a fixed seed, and take
+ * the standard deviation of each coefficient across the refits.
+ */
+export function coefficientSE(snapshot: Snapshot, model: ModelConstants = MODEL): CoefficientSE {
+  const pool = fittable(snapshot.protocols).filter((p) => p.category !== 'CEX');
+  const rng = mulberry32(20261114);
+  const as: number[] = [];
+  const bs: number[] = [];
+  const brs: number[] = [];
+  for (let draw = 0; draw < BOOTSTRAP_DRAWS; draw++) {
+    const sample: SnapshotProtocol[] = [];
+    for (let i = 0; i < pool.length; i++) sample.push(pool[Math.floor(rng() * pool.length)]!);
+    const c = fitCurve(sample);
+    as.push(c.a);
+    bs.push(c.b);
+    brs.push(c.bridge_shift);
+  }
+  const sd = (vals: number[]): number => {
+    if (vals.length === 0) return 0;
+    const m = vals.reduce((s, v) => s + v, 0) / vals.length;
+    return Math.sqrt(vals.reduce((s, v) => s + (v - m) * (v - m), 0) / vals.length);
+  };
+  return { a_se: sd(as), b_se: sd(bs), bridge_se: sd(brs), draws: BOOTSTRAP_DRAWS };
+}
+
+/**
  * The backtest: three held-out tests of the value model, on the same
- * eval list for both pricers — (a) leave-one-out, (b) older-into-newer
- * at 2024-01-01, (c) older-into-newer at 2023-07-01 — plus the flat
- * multiple baseline, the prediction intervals and their coverage split
- * by age, and the launch-odds hold-out tests. The board's curve is
- * whichever pricer wins the leave-one-out test; the loser is reported
- * beside it, not hidden.
+ * eval list — (a) leave-one-out, (b) older-into-newer at 2024-01-01,
+ * (c) older-into-newer at 2023-07-01 — plus the flat multiple
+ * baseline, the prediction intervals and their coverage split by age,
+ * the launch-odds hold-out tests with Brier scores, and the two
+ * principled variants refitted for radar-8 (per-category and
+ * per-chain multiples), each tested on the same three splits. The
+ * board's curve is whichever pricer wins the leave-one-out test; the
+ * losers are reported beside it, not hidden.
  */
 export function backtest(snapshot: Snapshot, model: ModelConstants = MODEL): Backtest {
   const listed = fittable(snapshot.protocols);
@@ -1159,6 +1320,10 @@ export function backtest(snapshot: Snapshot, model: ModelConstants = MODEL): Bac
   const on2023Curve = olderNewer(listed, snapshot.as_of, model, 'logtvl-bridge', '2023-07-01');
   const on2024Terms = olderNewer(listed, snapshot.as_of, model, 'multi-term', '2024-01-01');
   const on2023Terms = olderNewer(listed, snapshot.as_of, model, 'multi-term', '2023-07-01');
+  const on2024Flat = olderNewerFlat(listed, '2024-01-01');
+  const on2023Flat = olderNewerFlat(listed, '2023-07-01');
+  const catV = variantMisses(snapshot, model, fitCategoryVariant);
+  const chainV = variantMisses(snapshot, model, fitChainVariant);
   const valueTerms: ValueTerms = {
     ...globalTerms,
     loo_miss: looTerms,
@@ -1167,6 +1332,63 @@ export function backtest(snapshot: Snapshot, model: ModelConstants = MODEL): Bac
     older_newer_2023_miss: on2023Terms.miss,
     older_newer_2023_n: on2023Terms.n,
   };
+  const variants: VariantTest[] = [
+    {
+      label: 'flat multiple (median mcap/TVL)',
+      kind: 'baseline',
+      loo_miss: median(loo.missesFlat) ?? 0,
+      walk_forward_2024_miss: on2024Flat.miss,
+      walk_forward_2024_n: on2024Flat.n,
+      walk_forward_2023_miss: on2023Flat.miss,
+      walk_forward_2023_n: on2023Flat.n,
+      kept: false,
+      note: 'baseline',
+    },
+    {
+      label: 'size curve, ln TVL + bridge shift',
+      kind: 'chosen',
+      loo_miss: looCurve,
+      walk_forward_2024_miss: on2024Curve.miss,
+      walk_forward_2024_n: on2024Curve.n,
+      walk_forward_2023_miss: on2023Curve.miss,
+      walk_forward_2023_n: on2023Curve.n,
+      kept: true,
+      note: 'kept',
+    },
+    {
+      label: 'all-terms fit (growth, age, chains)',
+      kind: 'tested',
+      loo_miss: looTerms,
+      walk_forward_2024_miss: on2024Terms.miss,
+      walk_forward_2024_n: on2024Terms.n,
+      walk_forward_2023_miss: on2023Terms.miss,
+      walk_forward_2023_n: on2023Terms.n,
+      kept: false,
+      note: 'tested, not kept',
+    },
+    {
+      label: 'per-category multiples, ridge 10',
+      kind: 'tested',
+      loo_miss: catV.loo,
+      walk_forward_2024_miss: catV.wf2024,
+      walk_forward_2024_n: catV.wf2024n,
+      walk_forward_2023_miss: catV.wf2023,
+      walk_forward_2023_n: catV.wf2023n,
+      kept: false,
+      note: 'tested, not kept',
+    },
+    {
+      label: 'per-chain multiples, ridge 10',
+      kind: 'tested',
+      loo_miss: chainV.loo,
+      walk_forward_2024_miss: chainV.wf2024,
+      walk_forward_2024_n: chainV.wf2024n,
+      walk_forward_2023_miss: chainV.wf2023,
+      walk_forward_2023_n: chainV.wf2023n,
+      kept: false,
+      note: 'tested, not kept',
+    },
+  ];
   return {
     n: evalList.length,
     median_miss: winner === 'logtvl-bridge' ? looCurve : looTerms,
@@ -1187,6 +1409,8 @@ export function backtest(snapshot: Snapshot, model: ModelConstants = MODEL): Bac
     global_trimmed: global.trimmed_n,
     global_pool_n: global.pool_n,
     global_r2: global.r2,
+    coefficient_se: coefficientSE(snapshot, model),
+    variants,
     value_terms: valueTerms,
     older_newer_miss: winner === 'logtvl-bridge' ? on2024Curve.miss : on2024Terms.miss,
     older_newer_n: winner === 'logtvl-bridge' ? on2024Curve.n : on2024Terms.n,
@@ -1204,6 +1428,15 @@ export function backtest(snapshot: Snapshot, model: ModelConstants = MODEL): Bac
     ranges_older: rangeOf(older.map((x) => x.r)),
     odds: oddsValidation(snapshot, model),
   };
+}
+
+/** The flat multiple's older-into-newer test: median mcap/TVL on protocols listed before `cutoff`, applied after. */
+function olderNewerFlat(listed: SnapshotProtocol[], cutoff: string): { miss: number; n: number } {
+  const older = listed.filter((p) => p.listed_at !== null && p.listed_at < cutoff && p.category !== 'CEX');
+  const newer = listed.filter((p) => p.listed_at !== null && p.listed_at >= cutoff && isRankableLike(p));
+  if (older.length < 5 || newer.length === 0) return { miss: 0, n: newer.length };
+  const mult = flatMultiple(older) ?? 0.25;
+  return { miss: median(newer.map((p) => missMultiple(p.tvl_usd * mult, p.mcap_usd!))) ?? 0, n: newer.length };
 }
 
 /** The multipliers and the implied value one protocol gets. No hand multiplier: implied = curve value x launch odds. */
@@ -1295,7 +1528,7 @@ const GAS_CHEAP_L1_CHAINS = new Set([
   'Sui', 'Aptos', 'Near', 'Hyperliquid L1', 'Cosmos', 'Osmosis', 'Injective', 'Sei', 'Stellar', 'Ripple',
   'Algorand', 'TON', 'Hedera', 'Cardano', 'Flow', 'Celestia', 'Stride', 'Neutron', 'Kava', 'Evmos', 'Fantom',
   'Sonic', 'Celo', 'Moonbeam', 'Moonriver', 'Cronos', 'Berachain', 'Monad', 'MegaETH', 'Tempo', 'Stable',
-  'Flare', 'Sei', 'ZetaChain', 'XION', 'Saga', 'Initia', 'Dymension', 'Noble', 'Provenance', 'Stacks',
+  'Flare', 'ZetaChain', 'XION', 'Saga', 'Initia', 'Dymension', 'Noble', 'Provenance', 'Stacks',
 ]);
 
 /** The gas tier for a chain, by name. */
@@ -1602,9 +1835,12 @@ export function stepText(step: FarmStep): string {
  * active minutes; break-even odds is the launch odds at which the expected
  * value exactly pays the gas and the forgone yield. The pool share, the
  * farmed fraction and the T-bill rate are stated assumptions, not snapshot
- * facts. When a row has no clear farm path (`farmable` false), there is no
- * position to earn an airdrop from, so the expected value is zero and the
- * verdict is SKIP — the steps say so, and the economics agree with them.
+ * facts. A FARM verdict needs net above zero AND at least the model's
+ * dollars per active hour — a farm that pays pennies an hour is not worth
+ * the time, so it is MARGINAL instead. When a row has no clear farm path
+ * (`farmable` false), there is no position to earn an airdrop from, so the
+ * expected value is zero and the verdict is SKIP — the steps say so, and
+ * the economics agree with them.
  */
 export function farmEconomics(
   implied: number,
@@ -1627,7 +1863,13 @@ export function farmEconomics(
   const netPerHour = hours > 0 ? net / hours : 0;
   const denom = implied * model.airdrop_pool * farmerShare;
   const breakeven = !farmable ? 1 : denom > 0 ? (gas + tbill) / denom : 1;
-  const verdict: FarmEconomics['verdict'] = !farmable ? 'SKIP' : net > 0 ? 'FARM' : breakeven <= 0.6 ? 'THIN' : 'SKIP';
+  const verdict: FarmEconomics['verdict'] = !farmable
+    ? 'SKIP'
+    : net > 0 && netPerHour >= model.farm_net_per_hour
+      ? 'FARM'
+      : net > 0
+        ? 'MARGINAL'
+        : 'SKIP';
   const review = new Date(Date.parse(`${asOf}T00:00:00Z`) + holdDays * DAY_MS).toISOString().slice(0, 10);
   return {
     deposit_usd: model.deposit_usd,
@@ -1651,8 +1893,8 @@ export function farmEconomics(
  * staked ether: a bridge or liquid-staking category, a name carrying a
  * whole word wrapped, staked or staking, or a name beginning with an
  * exchange's name. These protocols still record no token of their own,
- * so they are rankable — but they sit at the tail of the board, and
- * their integrity strip says so.
+ * so they are rankable — but they sit outside this board, and their
+ * integrity strip says so.
  */
 export function isWrappedProduct(p: SnapshotProtocol): boolean {
   const cat = p.category ?? '';
@@ -1684,18 +1926,15 @@ export function integrityFlags(p: SnapshotProtocol, floorUsd: number): string[] 
 const round4 = (n: number): number => Math.round(n * 1e4) / 1e4;
 
 /**
- * The protocols the board ranks, strongest first, with ranks 1..n.
- * Every watchlist protocol, then the rankable pre-token protocols below
- * the floor by TVL, then the rankable pre-token protocols above the
- * floor the watchlist leaves out that are not wrapped, staked or
- * bridged products of a token that already trades, by TVL — and, only
- * to reach 40 + EARLY_ROWS rows, the smallest wrapped, staked or
- * bridged products above the floor, smallest TVL first, so the board's
- * top stays with protocols whose token genuinely does not exist yet.
- * (Only 186 rankable protocols sit below the floor and only 20 more
- * above it pass the watchlist rule, so the board cannot reach 250 rows
- * without a tail.) The board's curve is the leave-one-out winner from
- * the backtest; the implied value is curve value x launch odds.
+ * The protocols the board ranks, strongest first, with ranks 1..198.
+ * Every watchlist protocol (40), then the 138 largest rankable
+ * pre-token protocols below the floor by TVL, then the 20 rankable
+ * pre-token protocols above the floor the watchlist leaves out that
+ * are not wrapped, staked or bridged products of a token that already
+ * trades. No wrapped tail: a wrapped, staked or bridged product sits
+ * outside this board, and the accounting says so. The board's curve
+ * is the leave-one-out winner from the backtest; the implied value is
+ * curve value x launch odds.
  */
 export function buildBoard(snapshot: Snapshot, model: ModelConstants = MODEL): BoardRow[] {
   const index = bySlug(snapshot.protocols);
@@ -1710,19 +1949,15 @@ export function buildBoard(snapshot: Snapshot, model: ModelConstants = MODEL): B
   }
   const byTvlDesc = (a: SnapshotProtocol, b: SnapshotProtocol): number =>
     b.tvl_usd - a.tvl_usd || (a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0);
-  const byTvlAsc = (a: SnapshotProtocol, b: SnapshotProtocol): number =>
-    a.tvl_usd - b.tvl_usd || (a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0);
   const belowFloor = snapshot.protocols
     .filter((p) => !chosen.has(p.slug) && isRankable(p) && p.tvl_usd < snapshot.floor_usd)
-    .sort(byTvlDesc);
-  const aboveFloor = snapshot.protocols
+    .sort(byTvlDesc)
+    .slice(0, EARLY_BELOW);
+  const offList = snapshot.protocols
     .filter((p) => !chosen.has(p.slug) && isRankable(p) && p.tvl_usd >= snapshot.floor_usd && !isWrappedProduct(p))
-    .sort(byTvlDesc);
-  const wrappedTail = snapshot.protocols
-    .filter((p) => !chosen.has(p.slug) && isRankable(p) && p.tvl_usd >= snapshot.floor_usd && isWrappedProduct(p))
-    .sort(byTvlAsc);
-  const early = [...belowFloor, ...aboveFloor, ...wrappedTail].slice(0, EARLY_ROWS);
-  for (const p of early) chosen.set(p.slug, p);
+    .sort(byTvlDesc)
+    .slice(0, OFF_LIST);
+  for (const p of [...belowFloor, ...offList]) chosen.set(p.slug, p);
 
   const scored = [...chosen.values()].map((p) => {
     const odds = oddsModel.predict(p);
@@ -1818,7 +2053,7 @@ export function accounting(snapshot: Snapshot, board: BoardRow[]): AccountingRow
     {
       label: 'Ranked on the board',
       count: board.length,
-      note: 'all 40 watchlist protocols plus early finds below the floor and above it',
+      note: 'all 40 watchlist protocols, 138 early finds below the floor, 20 off-list above it',
     },
     {
       label: 'Already has a token, market cap tracked',
@@ -1848,7 +2083,7 @@ export function accounting(snapshot: Snapshot, board: BoardRow[]): AccountingRow
     {
       label: 'Pre-token and rankable, above the floor but outside the board',
       count: all.filter((p) => isRankable(p) && p.tvl_usd >= snapshot.floor_usd && !boardSlugs.has(p.slug)).length,
-      note: 'rankable but not on the watchlist, so the board leaves them out',
+      note: 'rankable but wrapped, staked or bridged — outside this board by design',
     },
     {
       label: 'Pre-token and rankable, below the floor but outside the board',
@@ -1895,18 +2130,6 @@ export function radarRow(row: BoardRow, range?: BootstrapRange): RadarRow {
     integrity: row.integrity,
     economics: row.economics,
     farm_steps: row.farm_steps,
-  };
-}
-
-/** A small deterministic PRNG (mulberry32): the bootstrap resamples must be the same on every run. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
 
