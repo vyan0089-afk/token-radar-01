@@ -1,21 +1,87 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Token Radar radar-7 — pre-token protocols ranked by implied value</title>
+<title>Radar-8 — Token Launch Radar</title>
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
-<a class="skip" href="#board">Skip to the board</a>
-<header class="top">
-  <div class="wrap">
-    <div class="brand"><span class="mark">◉</span><div><h1>TOKEN RADAR</h1><p class="sub">radar-7 · pre-token protocols, priced by a fitted curve — not by hand</p></div></div>
-    <div class="topmeta" id="topmeta"></div>
-  </div>
+<header>
+  <h1>Radar-8 <span>Token Launch Radar</span></h1>
+  <p class="sub">Pre-token protocols, priced by a model fitted to the snapshot's own traded comps and tested held out. An implied value is this board's own claim, never a promise a token will exist.</p>
+  <p class="meta" id="meta"></p>
 </header>
-<main id="app" class="wrap" aria-busy="true"><p class="loading">Loading the radar…</p></main>
-<footer class="wrap foot" id="foot"></footer>
+
+<section id="stats" aria-label="Headline figures"></section>
+
+<p class="formula" id="formula"></p>
+
+<section id="accounting" aria-label="Protocol accounting">
+  <h2>Protocol accounting — all 758 snapshot protocols in exactly one group</h2>
+  <div id="acct-bar"></div>
+  <div id="acct-legend"></div>
+</section>
+
+<p class="integrity" id="integrity"></p>
+
+<section id="evidence" aria-label="Out-of-sample evidence">
+  <h2>Out-of-sample evidence — does it hold on tokens it never saw?</h2>
+  <p class="note">A term is kept only if it lowers the held-out miss in both tests: leave-one-out (each traded token priced from a fit on the rest) and walk-forward (older listings price newer ones). The board never claims a token will launch.</p>
+  <div class="ev-grid">
+    <div><h3>Value model — typical miss (×)</h3><table id="ev-terms"></table></div>
+    <div><h3>Launch odds — Brier score (lower is better)</h3><table id="ev-odds"></table></div>
+    <div><h3>Is the printed range honest?</h3><table id="ev-range"></table></div>
+    <div><h3>Fitted curve ± bootstrap s.e. (200 refits)</h3><table id="ev-coef"></table></div>
+  </div>
+</section>
+
+<section id="charts" aria-label="Charts">
+  <h2>What the board looks like</h2>
+  <div class="charts">
+    <div class="chart"><h3>Traded comps — value against TVL (log scale)</h3><canvas id="scatter" width="520" height="300"></canvas><p class="note" id="scatter-note"></p></div>
+    <div class="chart"><h3>Implied value by category</h3><canvas id="cat" width="520" height="300"></canvas></div>
+    <div class="chart"><h3>Top FARM spotlight</h3><div id="spotlight"></div></div>
+  </div>
+</section>
+
+<section id="board" aria-label="Ranked board">
+  <h2>Ranked board — <span id="board-count"></span></h2>
+  <div class="filters">
+    <div class="tabs" id="verdict-tabs"></div>
+    <div class="tabs" id="group-tabs"></div>
+    <label>Deposit <select id="deposit"><option value="1000">$1,000</option><option value="10000">$10,000</option></select></label>
+    <label>Drop share <select id="drop"><option value="0.035">3.5%</option><option value="0.07" selected>7%</option><option value="0.14">14%</option></select></label>
+    <label>Horizon <select id="horizon"><option value="84" selected>12 wk</option><option value="28">4 wk</option><option value="182">26 wk</option></select></label>
+    <label>Search <input id="search" type="search" placeholder="name, chain, category"></label>
+    <label>Category <select id="category"><option value="">All categories</option></select></label>
+    <label>Chain <select id="chain"><option value="">All chains</option></select></label>
+    <button id="reset" type="button">Reset</button>
+    <button id="csv" type="button">CSV</button>
+    <button id="json" type="button">JSON</button>
+  </div>
+  <div class="table-wrap"><table id="rows">
+    <thead><tr>
+      <th data-sort="rank">#</th><th data-sort="name">Protocol</th><th data-sort="tvl_usd">TVL</th>
+      <th data-sort="change_7d">7D %</th><th data-sort="age_days">No-token age</th><th data-sort="launch_odds">Token odds</th>
+      <th data-sort="curve_value">If it launches</th><th data-sort="implied_value_usd">Implied value · P10–P90</th>
+      <th data-sort="net">Net of fees</th><th data-sort="net_hour">Net / hour</th><th data-sort="verdict">Verdict</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table></div>
+  <div class="pager"><button id="prev" type="button">← Prev</button><span id="page-info"></span><button id="next" type="button">Next →</button></div>
+</section>
+
+<section id="detail" aria-label="Protocol detail">
+  <h2>Protocol detail — <span id="detail-name">click a row</span></h2>
+  <div id="detail-body"><p class="note">Click any row in the board to see how its price was built, its farm plan with cost and time, and its range.</p></div>
+</section>
+
+<section id="method" aria-label="Methodology">
+  <h2>Methodology — read it before you farm</h2>
+  <div id="method-body"></div>
+</section>
+
+<footer><p id="foot"></p></footer>
 <script src="../data.js"></script>
 <script src="app.js"></script>
 </body>
