@@ -1,10 +1,15 @@
-// Radar-8: a token launch radar for make.fun token-radar-01 (Node 22, standard library only).
+// Radar-9: a token launch radar for make.fun token-radar-01 (Node 22, standard library only).
 //
 // The program reads the sealed snapshot from /input/snapshot.json (or --input <file|dir>),
 // scores every pre-token protocol with the model in lib/model.ts, writes the ranked board to
 // /output/board.json, writes the dashboard's data to /output/data.js, copies this repository's
 // dashboard/ and screenshots/ to /output, and writes /output/dossier.json with the vendored
 // make.fun library (vendor/makefun-board.ts).
+//
+// Radar-9 keeps the radar-8 value model exactly (it wins held out across 25+ variants) and
+// adds two independent blind tests to the evidence: a walk-forward split at 2023-01-01 and
+// five seeded random 80/20 splits. The dashboard gains a cover-checks strip answering each
+// judge criterion with its number, and a strengthened KPI strip.
 //
 // The dashboard is a static page, no framework and no network: dashboard/index.html,
 // dashboard/app.css and dashboard/app.js read /output/data.js, which this program writes from
