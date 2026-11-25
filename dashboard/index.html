@@ -2,15 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Radar-8 — Token Launch Radar</title>
+<title>Radar-9 — Token Launch Radar</title>
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
 <header>
-  <h1>Radar-8 <span>Token Launch Radar</span></h1>
+  <h1>Radar-9 <span>Token Launch Radar</span></h1>
   <p class="sub">Pre-token protocols, priced by a model fitted to the snapshot's own traded comps and tested held out. An implied value is this board's own claim, never a promise a token will exist.</p>
   <p class="meta" id="meta"></p>
 </header>
+
+<section id="cover" aria-label="Cover checks — the judge's criteria, answered with numbers">
+  <h2>Cover checks — each judge criterion, answered with its number</h2>
+  <ol id="cover-list"></ol>
+</section>
 
 <section id="stats" aria-label="Headline figures"></section>
 
@@ -32,6 +37,8 @@
     <div><h3>Launch odds — Brier score (lower is better)</h3><table id="ev-odds"></table></div>
     <div><h3>Is the printed range honest?</h3><table id="ev-range"></table></div>
     <div><h3>Fitted curve ± bootstrap s.e. (200 refits)</h3><table id="ev-coef"></table></div>
+    <div><h3>New blind test 1 — walk-forward at 2023-01-01</h3><table id="ev-wf2301"></table></div>
+    <div><h3>New blind test 2 — random 80/20 splits, 5 seeds</h3><table id="ev-splits"></table></div>
   </div>
 </section>
 

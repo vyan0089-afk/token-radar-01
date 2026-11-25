@@ -5,10 +5,17 @@ h1{font-size:26px;margin:22px 0 4px}h1 span{color:var(--muted);font-weight:400;f
 h2{font-size:17px;margin:26px 0 10px;border-bottom:1px solid var(--line);padding-bottom:6px}
 h3{font-size:13px;margin:0 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .sub{color:var(--muted);margin:0 0 4px;max-width:900px}.meta{color:var(--muted);margin:0;font-size:12px}
+#cover{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:8px;padding:12px 16px;margin-top:18px}
+#cover h2{margin:0 0 8px;border-bottom:0;padding-bottom:0}
+#cover-list{margin:0;padding-left:20px;font-size:13px}
+#cover-list li{margin:5px 0}
+#cover-list b{color:var(--text)}
+#cover-list .k{color:var(--muted)}
 #stats{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:18px}
 .stat{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
 .stat b{display:block;font-size:22px;line-height:1.2}.stat b small{font-size:12px;color:var(--muted)}
 .stat span{color:var(--muted);font-size:11px;display:block;margin-top:2px}
+.stat.hero b{font-size:26px;color:var(--green)}
 .formula{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin-top:14px;font-size:13px}
 #acct-bar{display:flex;height:26px;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
 #acct-bar div{height:100%}
