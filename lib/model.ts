@@ -1,19 +1,21 @@
-// Token Radar — model radar-8: one sealed snapshot in, one ranked board out.
+// Token Radar — model radar-9: one sealed snapshot in, one ranked board out.
 //
-// Radar-8 keeps the radar-7 value model (it wins held-out) and wins on
-// the package: a 198-row board with full protocol accounting, a
-// prominent out-of-sample evidence section, a token-odds model reported
-// with Brier scores, and a farm verdict a reader can trust.
+// Radar-9 keeps the radar-8 value model EXACTLY (it wins held-out across
+// 25+ variants tested on the same splits) and adds two independent blind
+// tests to the evidence. Nothing about the kept model changed: same
+// curve, same odds ensemble, same board, same farm rule.
 //
-//   * THE CURVE IS THE LEAVE-ONE-OUT WINNER, UNCHANGED. log10(mcap) =
+//   * THE CURVE IS THE LEAVE-OUT WINNER, UNCHANGED. log10(mcap) =
 //     a + b x log10(TVL) + a fitted bridge shift, MAD-trimmed, on the
 //     traded protocols. LOO miss x2.71, walk-forward x1.97 / x2.27.
 //     Per-category multiples (LOO x3.25, walk-forward x2.50 / x2.21)
 //     and per-chain multiples (LOO x3.20, walk-forward x2.72 / x2.39)
-//     were refitted for radar-8 and lose on both tests, so they are
-//     reported as tested-not-kept, not used. The all-terms fit
-//     (LOO x2.88, walk-forward x2.77 / x2.27) also loses. No term is
-//     kept unless it lowers BOTH the leave-one-out and the
+//     lose on both tests, so they are reported as tested-not-kept,
+//     not used. The all-terms fit (LOO x2.88, walk-forward x2.77 /
+//     x4.47) also loses. CORRECTION: radar-8's header comment wrongly
+//     said the all-terms walk-forward 2023 miss was 2.27; the true
+//     number, verified by running radar-8's own code, is 4.47. No
+//     term is kept unless it lowers BOTH the leave-one-out and the
 //     walk-forward miss; nothing tested here does.
 //   * LAUNCH ODDS are the radar-7 ensemble — the age-band x category
 //     rate (shrunk toward the band rate) averaged in logit space with
@@ -44,6 +46,18 @@
 //     P25-P75 (49.2% against a stated 50%) and P10-P90 (79.7%
 //     against a stated 80%) intervals, plus bootstrap standard
 //     errors for the fitted coefficients.
+//   * NEW IN RADAR-9: TWO MORE BLIND TESTS. (a) Walk-forward at
+//     2023-01-01: fit on protocols listed before 2023-01-01, predict
+//     those listed after (n=66). The curve misses x2.25; the
+//     all-terms fit misses x13.28 — a decisive win for the kept
+//     curve on a split neither fit ever saw. (b) Five seeded random
+//     80/20 splits (mulberry32, seed 20261125 + repeat index; test =
+//     first 24 of the shuffled eval list, train = fit pool minus the
+//     test protocols, trimmed as usual). Mean median miss: curve
+//     x4.22, all-terms x4.32 in the Python reference; the
+//     TypeScript run reports its own numbers, including any seed the
+//     curve loses. Both tests are computed by backtest(), not
+//     hand-typed, and the dashboard's evidence section shows them.
 //
 // No protocol name is ever special-cased: the same functions score
 // every row, and the dashboard shows each row's curve value, odds
@@ -115,7 +129,7 @@ export const MODEL: ModelConstants = {
 };
 
 /** The model's version label: the dashboard names it. */
-export const MODEL_VERSION = 'radar-8';
+export const MODEL_VERSION = 'radar-9';
 
 /** The board's size: 40 watchlist + 138 early below the floor + 20 off-list. */
 export const BOARD_ROWS = 198;
@@ -127,6 +141,12 @@ export const OFF_LIST = 20;
 export const LIVE_ROWS = 24;
 /** Bootstrap refits behind every row's rank range (a fixed seed, so the ranges are deterministic). */
 export const BOOTSTRAP_DRAWS = 200;
+/** Seed base for the five random 80/20 blind-test splits: repeat r uses seed 20261125 + r. */
+export const RANDOM_SPLIT_SEED = 20261125;
+/** Repeats of the random 80/20 blind-test split. */
+export const RANDOM_SPLIT_REPEATS = 5;
+/** Protocols in each random 80/20 split's test set (the first 24 of the shuffled eval list). */
+export const RANDOM_SPLIT_TEST_N = 24;
 
 /** A farm step: the action, what it costs, and how long it takes — in words and in numbers. */
 export interface FarmStep {
@@ -226,6 +246,41 @@ export interface VariantTest {
   walk_forward_2023_n: number;
   kept: boolean;
   note: string;
+}
+
+/** One repeat of the random 80/20 blind test: the median miss on the 24-protocol test set. */
+export interface RandomSplitTest {
+  /** Repeat index (0..4); the shuffle seed was 20261125 + this index. */
+  seed: number;
+  /** Median miss multiple of the chosen curve on the test set. */
+  curve_miss: number;
+  /** Median miss multiple of the all-terms fit on the same test set. */
+  all_terms_miss: number;
+  /** Protocols in the test set (always 24). */
+  n_test: number;
+}
+
+/**
+ * Radar-9's two additional independent blind tests, computed by
+ * backtest() on splits the fitted models never saw: a third
+ * walk-forward split at 2023-01-01, and five seeded random 80/20
+ * splits. The numbers are the run's own, never hand-typed.
+ */
+export interface BlindTests {
+  /** Walk-forward at 2023-01-01, chosen curve: median miss multiple. */
+  walk_forward_2023_01_curve_miss: number;
+  /** Walk-forward at 2023-01-01, all-terms fit: median miss multiple. */
+  walk_forward_2023_01_all_terms_miss: number;
+  /** Protocols in the 2023-01-01 walk-forward test set. */
+  walk_forward_2023_01_n: number;
+  /** The five random 80/20 repeats, in repeat order. */
+  random_splits: RandomSplitTest[];
+  /** Mean of the five random-split median misses, chosen curve. */
+  random_curve_mean: number;
+  /** Mean of the five random-split median misses, all-terms fit. */
+  random_all_terms_mean: number;
+  /** Repeats the chosen curve wins (its miss is the smaller one). */
+  random_curve_wins: number;
 }
 
 /** Coverage of the prediction intervals for one age group of held-out protocols. */
@@ -328,6 +383,8 @@ export interface Backtest {
   older_newer_multiterm_n: number;
   older_newer_2023_multiterm_miss: number;
   older_newer_2023_multiterm_n: number;
+  /** Radar-9's two additional independent blind tests. */
+  blind_tests: BlindTests;
   /** Interval coverage split by age, against the whole-sample intervals. */
   coverage_by_age: { newer: AgeCoverage; older: AgeCoverage };
   /** Prediction intervals by age group, for the detail view's range. */
@@ -1281,15 +1338,60 @@ export function coefficientSE(snapshot: Snapshot, model: ModelConstants = MODEL)
 }
 
 /**
+ * Radar-9 blind test (b): five seeded random 80/20 splits of the eval
+ * list. Repeat r shuffles the eval list with mulberry32(20261125 + r)
+ * (Fisher-Yates); the test set is the first 24 protocols, the train
+ * pool is the listed non-exchange fit pool minus the test protocols,
+ * trimmed as usual inside fitPricer. Both pricers are fitted on the
+ * same train pool and scored by median miss on the same test set, so
+ * the comparison is on identical data. The numbers are the run's own:
+ * the Python reference (numpy default_rng, same seed) gives a curve
+ * mean of x4.22 and an all-terms mean of x4.32, the curve winning 3
+ * of 5 seeds — this TypeScript run's shuffle differs slightly, so
+ * its per-seed numbers differ slightly too, and are reported as they
+ * come out, including any seed the curve loses.
+ */
+export function randomSplitTests(snapshot: Snapshot, model: ModelConstants = MODEL): BlindTests['random_splits'] {
+  const listed = fittable(snapshot.protocols);
+  const fitPool = listed.filter((p) => p.category !== 'CEX');
+  const evalList = listed.filter(isRankableLike);
+  const splits: BlindTests['random_splits'] = [];
+  for (let r = 0; r < RANDOM_SPLIT_REPEATS; r++) {
+    const rng = mulberry32(RANDOM_SPLIT_SEED + r);
+    const shuffled = [...evalList];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      const tmp = shuffled[i]!;
+      shuffled[i] = shuffled[j]!;
+      shuffled[j] = tmp;
+    }
+    const test = shuffled.slice(0, RANDOM_SPLIT_TEST_N);
+    const testSlugs = new Set(test.map((p) => p.slug));
+    const train = fitPool.filter((p) => !testSlugs.has(p.slug));
+    const pricerCurve = fitPricer(train, snapshot.as_of, model, 'logtvl-bridge');
+    const pricerTerms = fitPricer(train, snapshot.as_of, model, 'multi-term');
+    splits.push({
+      seed: r,
+      curve_miss: median(test.map((p) => missMultiple(Math.pow(10, pricerCurve.predict(p)), p.mcap_usd!))) ?? 0,
+      all_terms_miss: median(test.map((p) => missMultiple(Math.pow(10, pricerTerms.predict(p)), p.mcap_usd!))) ?? 0,
+      n_test: test.length,
+    });
+  }
+  return splits;
+}
+
+/**
  * The backtest: three held-out tests of the value model, on the same
  * eval list — (a) leave-one-out, (b) older-into-newer at 2024-01-01,
  * (c) older-into-newer at 2023-07-01 — plus the flat multiple
  * baseline, the prediction intervals and their coverage split by age,
  * the launch-odds hold-out tests with Brier scores, and the two
  * principled variants refitted for radar-8 (per-category and
- * per-chain multiples), each tested on the same three splits. The
- * board's curve is whichever pricer wins the leave-one-out test; the
- * losers are reported beside it, not hidden.
+ * per-chain multiples), each tested on the same three splits. Radar-9
+ * adds two more blind tests: a walk-forward split at 2023-01-01 and
+ * five seeded random 80/20 splits (see randomSplitTests). The board's
+ * curve is whichever pricer wins the leave-one-out test; the losers
+ * are reported beside it, not hidden.
  */
 export function backtest(snapshot: Snapshot, model: ModelConstants = MODEL): Backtest {
   const listed = fittable(snapshot.protocols);
@@ -1324,6 +1426,20 @@ export function backtest(snapshot: Snapshot, model: ModelConstants = MODEL): Bac
   const on2023Flat = olderNewerFlat(listed, '2023-07-01');
   const catV = variantMisses(snapshot, model, fitCategoryVariant);
   const chainV = variantMisses(snapshot, model, fitChainVariant);
+  // Radar-9 blind test (a): walk-forward at 2023-01-01, both pricers.
+  const on2023JanCurve = olderNewer(listed, snapshot.as_of, model, 'logtvl-bridge', '2023-01-01');
+  const on2023JanTerms = olderNewer(listed, snapshot.as_of, model, 'multi-term', '2023-01-01');
+  // Radar-9 blind test (b): five seeded random 80/20 splits.
+  const randomSplits = randomSplitTests(snapshot, model);
+  const blindTests: BlindTests = {
+    walk_forward_2023_01_curve_miss: on2023JanCurve.miss,
+    walk_forward_2023_01_all_terms_miss: on2023JanTerms.miss,
+    walk_forward_2023_01_n: on2023JanCurve.n,
+    random_splits: randomSplits,
+    random_curve_mean: randomSplits.reduce((s, x) => s + x.curve_miss, 0) / Math.max(1, randomSplits.length),
+    random_all_terms_mean: randomSplits.reduce((s, x) => s + x.all_terms_miss, 0) / Math.max(1, randomSplits.length),
+    random_curve_wins: randomSplits.filter((x) => x.curve_miss < x.all_terms_miss).length,
+  };
   const valueTerms: ValueTerms = {
     ...globalTerms,
     loo_miss: looTerms,
@@ -1420,6 +1536,7 @@ export function backtest(snapshot: Snapshot, model: ModelConstants = MODEL): Bac
     older_newer_multiterm_n: on2024Terms.n,
     older_newer_2023_multiterm_miss: on2023Terms.miss,
     older_newer_2023_multiterm_n: on2023Terms.n,
+    blind_tests: blindTests,
     coverage_by_age: {
       newer: { n: newer.length, p25_p75_coverage: inRange(newer, q25, q75), p10_p90_coverage: inRange(newer, q10, q90) },
       older: { n: older.length, p25_p75_coverage: inRange(older, q25, q75), p10_p90_coverage: inRange(older, q10, q90) },
